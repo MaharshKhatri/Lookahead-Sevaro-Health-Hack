@@ -1,6 +1,6 @@
 import { auditTrail } from '@lookahead/engine';
 import { errorJson, guard, json } from '@/server/http';
-import { getStore } from '@/server/store';
+import { getReadyStore } from '@/server/store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export function GET(_req: Request, ctx: { params: Promise<{ offerId: string }> }): Promise<Response> {
   return guard(async () => {
     const { offerId } = await ctx.params;
-    const s = getStore().snapshot();
+    const s = (await getReadyStore()).snapshot();
     const trail = auditTrail(s.log, decodeURIComponent(offerId), s.clock.nowMs);
     return trail === null ? errorJson('UNKNOWN_OFFER', `no offer ${offerId}`) : json(trail);
   });

@@ -1,5 +1,5 @@
 import { guard, json, readJson } from '@/server/http';
-import { SPEEDS, StoreError, getStore, type ClockAction } from '@/server/store';
+import { SPEEDS, StoreError, getReadyStore, type ClockAction } from '@/server/store';
 import type { ClockSpeed } from '@/lib/dto';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +45,7 @@ export function POST(req: Request): Promise<Response> {
       default:
         throw new StoreError('BAD_REQUEST', 'action must be one of set, play, pause, advance, jump');
     }
-    const store = getStore();
+    const store = await getReadyStore();
     const clock = await store.moveClock(a);
     const s = store.snapshot();
     return json({ ok: true, clock, version: s.version, logSeq: s.log.at(-1)?.seq ?? 0 });

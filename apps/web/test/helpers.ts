@@ -16,9 +16,10 @@ process.env.LOOKAHEAD_DATA_DIR = DATA_DIR;
 
 export const BASE = 'http://localhost:3000';
 
-export function req(path: string, init: RequestInit & { role?: string; actorId?: string } = {}): Request {
+export function req(path: string, init: RequestInit & { role?: string; actorId?: string; cookie?: string } = {}): Request {
   const headers = new Headers(init.headers);
   if (init.role !== undefined) headers.set('x-lookahead-role', init.role);
+  if (init.cookie !== undefined) headers.set('cookie', init.cookie);
   if (init.actorId !== undefined) headers.set('x-lookahead-actor-id', init.actorId);
   if (init.body !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
   return new Request(`${BASE}${path}`, { ...init, headers });

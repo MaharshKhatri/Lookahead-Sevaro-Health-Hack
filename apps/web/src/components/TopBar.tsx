@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import type { UiRole } from '@/lib/dto';
 import { etHm, etHms } from '@/lib/format';
 import { useLive } from './live';
@@ -20,11 +21,49 @@ const LINKS = [
   { href: '/integrity', label: 'Integrity' },
   { href: '/inject', label: 'Inject' },
   { href: '/lead', label: 'Lead inbox' },
+  { href: '/admin/dataset', label: 'Dataset' },
 ];
+
+/** Switching the console to Clinical lead needs the lead PIN (OQ-44); the server sets an HttpOnly cookie. */
+export function PinPrompt({ onDone, onCancel }: { readonly onDone: () => void; readonly onCancel: () => void }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/70" role="dialog" aria-modal="true" aria-label="Clinical lead PIN">
+      <form
+        className="w-[360px] rounded-xl border border-border bg-panel p-5 shadow-2xl"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void fetch('/api/auth/lead', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) }).then((r) => (r.ok ? onDone() : setError('Wrong PIN.')));
+        }}
+      >
+        <div className="text-[13px] font-semibold uppercase tracking-wider text-accent">Clinical lead</div>
+        <div className="mt-1 text-[18px] font-semibold">Enter the lead PIN</div>
+        <input data-testid="console-pin" autoFocus inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} className="num mt-3 w-full rounded-md border border-border bg-bg p-2 text-[20px] tracking-[0.3em]" aria-label="Lead PIN" />
+        {error !== null && <p className="mt-2 text-[14px] text-critical">{error}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button tone="muted" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" testId="console-pin-submit" disabled={pin.trim() === ''}>
+            Unlock
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 export function TopBar() {
   const { view, sse, role, setRole, clock, toasts, dismiss } = useLive();
   const path = usePathname();
+  const [pinFor, setPinFor] = useState(false);
+  const chooseRole = (r: UiRole) => {
+    if (r !== 'clinical_lead') return setRole(r);
+    void fetch('/api/auth/lead', { cache: 'no-store' })
+      .then((x) => x.json() as Promise<{ lead?: boolean }>)
+      .then((b) => (b.lead === true ? setRole(r) : setPinFor(true)));
+  };
   const c = view?.clock;
   const playing = c?.mode === 'playing';
   const snapLabel = c === undefined ? '18:20' : etHm(c.snapshotMs);
@@ -67,6 +106,9 @@ export function TopBar() {
           <Button size="sm" tone="muted" onClick={() => void clock({ action: 'advance', minutes: 5 })}>
             +5m
           </Button>
+          <Button size="sm" tone="muted" testId="advance-11" title="Past a delivered offer's 10-minute expiry" onClick={() => void clock({ action: 'advance', minutes: 11 })}>
+            +11m
+          </Button>
           <Button size="sm" tone="muted" testId="jump-1900" onClick={() => void clock({ action: 'jump', to: '19:00' })}>
             Jump 19:00
           </Button>
@@ -96,7 +138,7 @@ export function TopBar() {
           <select
             data-testid="role-switcher"
             value={role}
-            onChange={(e) => setRole(e.target.value as UiRole)}
+            onChange={(e) => chooseRole(e.target.value as UiRole)}
             className="rounded-md border border-border bg-raised px-2 py-1 text-[14px] font-semibold text-text"
           >
             <option value="coordinator">Coordinator</option>
@@ -116,6 +158,26 @@ export function TopBar() {
             No new Sevaro events since <span className="num font-semibold">{etHms(view.noNewEventsSince)}</span> — state is frozen at last known activity
           </span>
         </div>
+      )}
+      {view !== null && view.integrity.diffs > 0 && (
+        <div role="alert" data-testid="snapshot-mismatch-banner" className="flex items-center gap-3 border-b border-critical/50 bg-critical/15 px-5 py-1.5 text-[14px] text-critical">
+          <span className="font-semibold uppercase tracking-wide">Replay differs</span>
+          <span>
+            Replay differs from your snapshot: <span className="num font-semibold">{view.integrity.diffs}</span> cells ({view.integrity.physicians} physicians, {view.integrity.consults} consults).
+          </span>
+          <Link href="/integrity" className="font-semibold underline">
+            See /integrity
+          </Link>
+        </div>
+      )}
+      {pinFor && (
+        <PinPrompt
+          onDone={() => {
+            setPinFor(false);
+            setRole('clinical_lead');
+          }}
+          onCancel={() => setPinFor(false)}
+        />
       )}
       <Toasts toasts={toasts} dismiss={dismiss} />
     </>

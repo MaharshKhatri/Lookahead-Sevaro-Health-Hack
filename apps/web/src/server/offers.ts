@@ -22,6 +22,7 @@ import {
 } from '@lookahead/engine';
 import type { EscalationDTO, OfferDTO, PublicOfferDTO, TrapDTO, WhatIfDTO, WhatIfRowDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
+import { offerPath } from './auth';
 import type { StoreSnapshot } from './store';
 
 /**
@@ -74,7 +75,7 @@ export function offerDTOs(log: ActionLog, nowMs: number): OfferDTO[] {
         allowedActions: v.allowedActions,
         outcome,
         coverageEffect: accepted,
-        offerPath: `/offer/${encodeURIComponent(v.offerId)}`,
+        offerPath: offerPath(v.offerId),
       },
     ];
   });

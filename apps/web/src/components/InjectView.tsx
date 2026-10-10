@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type DragEvent } from 'react';
 import type { ViewDTO } from '@/lib/dto';
 import { etHms } from '@/lib/format';
 import type { InjectResult } from '@/server/store';
@@ -43,7 +43,22 @@ function Body() {
   const [advance, setAdvance] = useState(true);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<(InjectResult & { ok: boolean }) | null>(null);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [drag, setDrag] = useState(false);
   if (view === null) return <p className="p-8 text-muted">Loading…</p>;
+
+  /** A CSV file in event_stream format (with or without header) goes into the textarea for review, then Submit. */
+  async function loadFile(f: File | undefined) {
+    if (f === undefined) return;
+    const text = await f.text();
+    setText(text.replace(/^\uFEFF/, ''));
+    setLoaded(`${f.name}: ${text.trim().split(/\r?\n/).length} lines loaded; review, then Submit rows`);
+  }
+  const onDrop = (e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setDrag(false);
+    void loadFile(e.dataTransfer.files[0]);
+  };
 
   async function submit() {
     setBusy(true);
@@ -72,6 +87,19 @@ function Body() {
             Paste rows with or without the header. A blank <span className="num">ingested_at</span> is stamped with the sim clock. Rows dated after the clock become known when the clock reaches them (knowledge time); duplicates are reported, bad lines rejected
             with their line number. No restart.
           </p>
+          <label
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDrag(true);
+            }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={onDrop}
+            className={`flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-3 py-2 text-[13px] ${drag ? 'border-accent bg-accent/10 text-text' : 'border-border text-muted'}`}
+          >
+            <span className="font-semibold text-text">Drop a CSV file</span> or click to choose (event_stream.csv format)
+            <input type="file" accept=".csv,text/csv,text/plain" className="hidden" data-testid="inject-file" onChange={(e) => void loadFile(e.target.files?.[0])} />
+            {loaded !== null && <span className="ml-auto text-ok">{loaded}</span>}
+          </label>
           <textarea
             data-testid="inject-text"
             value={text}

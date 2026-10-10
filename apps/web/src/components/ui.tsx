@@ -114,6 +114,7 @@ export function Button({
   className,
   testId,
   size = 'md',
+  type = 'button',
 }: {
   readonly children: ReactNode;
   readonly onClick?: () => void;
@@ -123,6 +124,7 @@ export function Button({
   readonly className?: string;
   readonly testId?: string;
   readonly size?: 'sm' | 'md' | 'lg';
+  readonly type?: 'button' | 'submit';
 }) {
   const tones = {
     accent: 'bg-accent text-bg hover:bg-accent/85 border-accent',
@@ -133,7 +135,7 @@ export function Button({
   const sizes = { sm: 'px-2 py-1 text-[13px]', md: 'px-3 py-1.5 text-[14px]', lg: 'px-5 py-4 text-[20px]' };
   return (
     <button
-      type="button"
+      type={type}
       data-testid={testId}
       title={title}
       disabled={disabled}

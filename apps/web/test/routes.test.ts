@@ -15,7 +15,8 @@ import * as offerRoute from '@/app/api/offers/[id]/route';
 import * as streamRoute from '@/app/api/stream/route';
 import * as viewRoute from '@/app/api/view/route';
 import type { CommandResponse, PublicOfferDTO, ViewDTO } from '@/lib/dto';
-import { disposeStore, getStore } from '@/server/store';
+import { LEAD_COOKIE, leadCookieValue, offerToken } from '@/server/auth';
+import { disposeStore, getReadyStore } from '@/server/store';
 import { memoSize } from '@/server/view';
 
 /**
@@ -29,9 +30,20 @@ const engineAt1820 = (() => {
   return decide(ds, now);
 })();
 
+const liveKeyDir = async () => join(LIVE_DIR, (await getReadyStore()).snapshot().datasetMeta.key);
 const view = async () => body<ViewDTO>(await viewRoute.GET(req('/api/view')));
+const leadCookie = () => `${LEAD_COOKIE}=${encodeURIComponent(leadCookieValue())}`;
+/** The clinical lead carries the PIN cookie; a physician's answer carries the offer link token (OQ-44). */
 const command = (role: string, cmd: Record<string, unknown>, extra: Record<string, unknown> = {}, actorId?: string) =>
-  commandsRoute.POST(req('/api/commands', { method: 'POST', role, ...(actorId === undefined ? {} : { actorId }), body: JSON.stringify({ command: cmd, ...extra }) }));
+  commandsRoute.POST(
+    req('/api/commands', {
+      method: 'POST',
+      role,
+      ...(actorId === undefined ? {} : { actorId }),
+      ...(role === 'clinical_lead' ? { cookie: leadCookie() } : {}),
+      body: JSON.stringify({ command: cmd, ...(role === 'physician' && typeof cmd.offerId === 'string' ? { token: offerToken(cmd.offerId) } : {}), ...extra }),
+    }),
+  );
 const clock = (b: Record<string, unknown>) => clockRoute.POST(req('/api/clock', { method: 'POST', body: JSON.stringify(b) }));
 
 async function proposeTop(commandId = 'cmd-propose'): Promise<string> {
@@ -106,6 +118,28 @@ describe('GET /api/view at the reference instant (brief "What Teams Must Demonst
   });
 });
 
+describe('demo safety (Session 7)', () => {
+  it('OQ-46: the quiet-feed banner appears only when the clock is more than 2 min past the last ingested event', async () => {
+    const v = await view();
+    expect(v.lastEventAtMs).not.toBeNull();
+    expect(v.clock.nowMs - (v.lastEventAtMs ?? 0)).toBeLessThan(120_000);
+    expect(v.noNewEventsSince).toBeUndefined();
+    await clock({ action: 'advance', minutes: 3 });
+    expect((await view()).noNewEventsSince).toBe(v.lastEventAtMs);
+  });
+
+  it('OQ-43: after a decline the engine offers nobody else for the same need, and the view suggests escalation', async () => {
+    const offerId = await proposeTop();
+    await command('clinical_lead', { type: 'approveOffer', offerId });
+    const physicianId = engineAt1820.recommendedOffer?.physicianId ?? '';
+    expect((await command('physician', { type: 'respond', offerId, response: 'decline' }, {}, physicianId)).status).toBe(200);
+    const v = await view();
+    expect(v.offers[0]?.status).toBe('declined');
+    expect(v.nextOffer).toMatchObject({ physicianId: null, escalationSuggested: true });
+    expect(v.nextOffer.why.join(' ')).toContain('no further eligible physician');
+  });
+});
+
 describe('POST /api/events (live append, brief #8)', () => {
   it('accepts a new row, reports a duplicate and rejects a bad row, with line numbers', async () => {
     const v = await view();
@@ -123,8 +157,8 @@ describe('POST /api/events (live append, brief #8)', () => {
     const after = await view();
     expect(after.integrity.appendedCount).toBe(1);
     expect(after.consults.some((c) => c.consultId === v.sample.nextConsultId)).toBe(true);
-    // Persisted to data/live/events.jsonl.
-    expect(readFileSync(join(LIVE_DIR, 'events.jsonl'), 'utf8')).toContain(e1);
+    // Persisted to data/live/<datasetKey>/events.jsonl (FileRepo).
+    expect(readFileSync(join(await liveKeyDir(), 'events.jsonl'), 'utf8')).toContain(e1);
   });
 
   it('accepts JSON {text} and rejects an empty body with 400', async () => {
@@ -199,18 +233,18 @@ describe('POST /api/commands (brief "Users and Decision Rights")', () => {
 describe('closed loop through the routes (brief #6) and the phone view', () => {
   it('propose -> approve -> phone sees only the message -> accept -> offer accepted, coverage effect frozen, audit lists 6', async () => {
     const offerId = await proposeTop();
-    let phone = await body<PublicOfferDTO>(await offerRoute.GET(req(`/api/offers/${offerId}`), params({ id: offerId })));
+    let phone = await body<PublicOfferDTO>(await offerRoute.GET(req(`/api/offers/${offerId}?t=${offerToken(offerId)}`), params({ id: offerId })));
     expect(phone.status).toBe('proposed');
     expect(phone.messageLines).toBeNull();
     expect((await command('clinical_lead', { type: 'approveOffer', offerId })).status).toBe(200);
-    phone = await body<PublicOfferDTO>(await offerRoute.GET(req(`/api/offers/${offerId}`), params({ id: offerId })));
+    phone = await body<PublicOfferDTO>(await offerRoute.GET(req(`/api/offers/${offerId}?t=${offerToken(offerId)}`), params({ id: offerId })));
     expect(phone.status).toBe('delivered');
     expect(phone.canRespond).toBe(true);
     expect(phone.messageLines?.join('\n')).not.toMatch(/\bCON-\d+|\bstroke\b|\bpatient/i);
     expect(phone.msUntilExpiry).toBe(10 * 60_000);
     // QR for delivered offers, rendered server-side, on the request's host.
     const v = await view();
-    expect(v.qr?.[offerId]?.url).toBe(`http://localhost:3000/offer/${offerId}`);
+    expect(v.qr?.[offerId]?.url).toBe(`http://localhost:3000/offer/${offerId}?t=${offerToken(offerId)}`);
     expect(v.qr?.[offerId]?.svg).toContain('<svg');
     const accept = await command('physician', { type: 'respond', offerId, response: 'accept' }, {}, phone.physicianId);
     expect(accept.status).toBe(200);
@@ -226,8 +260,23 @@ describe('closed loop through the routes (brief #6) and the phone view', () => {
     expect(csv.split('\n')[1]).toContain(offerId);
   });
 
+  it('OQ-44: the phone view and the answer need the offer link token; lead commands need the PIN cookie', async () => {
+    const offerId = await proposeTop();
+    const noToken = await offerRoute.GET(req(`/api/offers/${offerId}`), params({ id: offerId }));
+    expect(noToken.status).toBe(403);
+    expect((await body(noToken)).code).toBe('BAD_TOKEN');
+    const noPin = await commandsRoute.POST(req('/api/commands', { method: 'POST', role: 'clinical_lead', body: JSON.stringify({ command: { type: 'approveOffer', offerId } }) }));
+    expect(noPin.status).toBe(401);
+    expect((await body(noPin)).code).toBe('PIN_REQUIRED');
+    expect((await command('clinical_lead', { type: 'approveOffer', offerId })).status).toBe(200);
+    const physicianId = engineAt1820.recommendedOffer?.physicianId ?? '';
+    const forged = await command('physician', { type: 'respond', offerId, response: 'accept' }, { token: 'forged-token' }, physicianId);
+    expect(forged.status).toBe(403);
+    expect((await body(forged)).code).toBe('BAD_TOKEN');
+  });
+
   it('unknown offer is 404 JSON', async () => {
-    const r = await offerRoute.GET(req('/api/offers/off-nope'), params({ id: 'off-nope' }));
+    const r = await offerRoute.GET(req(`/api/offers/off-nope?t=${offerToken('off-nope')}`), params({ id: 'off-nope' }));
     expect(r.status).toBe(404);
     expect((await body(r)).code).toBe('UNKNOWN_OFFER');
   });
@@ -270,14 +319,14 @@ describe('POST /api/clock', () => {
 describe('persistence and reset', () => {
   it('a restart replays data/live (events and actions); reset clears it', async () => {
     const offerId = await proposeTop();
-    expect(existsSync(join(LIVE_DIR, 'actions.jsonl'))).toBe(true);
+    expect(existsSync(join(await liveKeyDir(), 'actions.jsonl'))).toBe(true);
     disposeStore();
     const v = await view();
     expect(v.offers.map((o) => o.offerId)).toEqual([offerId]);
     await resetRoute.POST();
     expect((await view()).offers).toHaveLength(0);
-    expect(existsSync(join(LIVE_DIR, 'actions.jsonl'))).toBe(false);
-    expect(getStore().bootWarnings).toEqual([]);
+    expect(existsSync(join(await liveKeyDir(), 'actions.jsonl'))).toBe(false);
+    expect((await getReadyStore()).bootWarnings).toEqual([]);
   });
 });
 
@@ -293,7 +342,7 @@ describe('GET /api/integrity and /api/stream', () => {
 
   it('stream: hello with the version, then a message on each mutation', async () => {
     const ac = new AbortController();
-    const res = streamRoute.GET(req('/api/stream', { signal: ac.signal }));
+    const res = await streamRoute.GET(req('/api/stream', { signal: ac.signal }));
     expect(res.headers.get('content-type')).toContain('text/event-stream');
     const reader = res.body?.getReader();
     const dec = new TextDecoder();

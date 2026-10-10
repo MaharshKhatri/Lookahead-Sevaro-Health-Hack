@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import type { EscalationDTO, OfferDTO, ViewDTO, WhatIfRowDTO } from '@/lib/dto';
 import { etEnd, etHm, etHms } from '@/lib/format';
+import { Explain } from './Explain';
 import { LiveProvider, useLive } from './live';
 import { Button, Chip, StatusPill, Toasts, cx, shortName } from './ui';
 
@@ -107,6 +108,10 @@ function OfferApproval({ o, view }: { readonly o: OfferDTO; readonly view: ViewD
           </ul>
         </Section>
       )}
+
+      <Section title="Briefing">
+        <Explain kind="lead_briefing" id={o.offerId} auto />
+      </Section>
 
       <Section title="Message the physician will receive">
         <pre className="num whitespace-pre-wrap rounded-lg border border-border bg-bg p-2.5 text-[13px] text-text/90">{o.message}</pre>

@@ -304,8 +304,19 @@ export interface OfferContextDTO {
   readonly whatIf: WhatIfDTO;
 }
 
+export interface DatasetInfoDTO {
+  readonly key: string;
+  readonly label: string;
+  readonly source: 'raw' | 'upload';
+  readonly snapshotLabel: string | null;
+  readonly eventCount: number;
+  readonly previousLabel: string | null;
+  readonly store: string;
+}
+
 export interface ViewDTO {
   readonly bootId: string;
+  readonly dataset: DatasetInfoDTO;
   readonly version: number;
   readonly logSeq: number;
   readonly clock: ClockDTO;
@@ -323,6 +334,14 @@ export interface ViewDTO {
   /** Trap + what-if for the tabs: the latest offer if any, else the recommended one. */
   readonly offerContext: OfferContextDTO;
   readonly offers: readonly OfferDTO[];
+  /** Who to offer next (engine recommendNext once an offer was declined, expired or rejected; OQ-43). */
+  readonly nextOffer: {
+    readonly physicianId: string | null;
+    readonly name: string | null;
+    readonly why: readonly string[];
+    readonly spent: readonly { readonly offerId: string; readonly physicianId: string; readonly name: string; readonly status: string }[];
+    readonly escalationSuggested: boolean;
+  };
   readonly escalations: readonly EscalationDTO[];
   readonly physicians: readonly PhysicianRowDTO[];
   readonly consults: readonly ConsultRowDTO[];

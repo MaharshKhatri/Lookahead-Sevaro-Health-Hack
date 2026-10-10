@@ -1,5 +1,5 @@
 import 'server-only';
-import { decideWithLog, headSeq, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
+import { QUIET_FEED_BANNER_MS, decideWithLog, headSeq, recommendNext, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
 import type { AttentionDTO, ConsultRowDTO, EvidenceDTO, FlagDTO, InjectSampleDTO, OfferContextDTO, PhysicianRowDTO, RecommendationDTO, RecommendedOfferDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { buildGrid } from './grid';
@@ -42,11 +42,21 @@ function buildView(s: StoreSnapshot): ViewDTO {
   const lastEventAtMs = lastIngested(s, nowMs);
   return {
     bootId: s.bootId,
+    dataset: {
+      key: s.datasetMeta.key,
+      label: s.datasetMeta.label,
+      source: s.datasetMeta.source,
+      snapshotLabel: s.datasetMeta.snapshotLabel,
+      eventCount: s.dataset.events.length,
+      previousLabel: s.previousMeta?.label ?? null,
+      store: s.storeKind,
+    },
     version: s.version,
     logSeq: headSeq(s.log),
     clock: { nowMs, mode: s.clock.mode, speed: s.clock.speed, snapshotMs: s.snapshotMs, scenarioDate: det.state.scenarioDate },
     lastEventAtMs,
-    ...(lastEventAtMs !== null && nowMs > lastEventAtMs ? { noNewEventsSince: lastEventAtMs } : {}),
+    // OQ-46: a normal gap between events is not a stale feed.
+    ...(lastEventAtMs !== null && nowMs - lastEventAtMs > QUIET_FEED_BANNER_MS ? { noNewEventsSince: lastEventAtMs } : {}),
     integrity: integritySummary(s),
     attention,
     coverage: buildGrid(d),
@@ -59,6 +69,7 @@ function buildView(s: StoreSnapshot): ViewDTO {
     recommendedOffer,
     offerContext: offerContext(s, d, offers, recommendedOffer),
     offers,
+    nextOffer: nextOfferDTO(s, d, offers),
     escalations: escalationDTOs(s.log, nowMs, (id) => det.attention.find((a) => a.id === id)?.headline ?? null),
     physicians: physicianRows(det.state),
     consults: consultRows(det.state, det.standards, nowMs),
@@ -140,6 +151,19 @@ function offerContext(s: StoreSnapshot, d: DecisionReport, offers: ViewDTO['offe
   }
   if (rec !== null) return { source: 'recommended', offerId: null, trap: rec.trap, whatIf: rec.whatIf };
   return { source: 'none', offerId: null, trap: null, whatIf: recommendedWhatIf(d) };
+}
+
+/**
+ * OQ-37/OQ-43: after a decline, an expiry or a rejection the engine's
+ * recommendNext skips that physician for overlapping needs; with nobody left
+ * the escalation stays with the clinical lead.
+ */
+function nextOfferDTO(s: StoreSnapshot, d: DecisionReport, offers: ViewDTO['offers']): ViewDTO['nextOffer'] {
+  const spent = offers.filter((o) => ['declined', 'expired', 'rejected'].includes(o.status)).map((o) => ({ offerId: o.offerId, physicianId: o.physicianId, name: o.name, status: o.status }));
+  if (spent.length === 0) return { physicianId: d.recommendedOffer?.physicianId ?? null, name: d.recommendedOffer?.name ?? null, why: [], spent, escalationSuggested: false };
+  const next = recommendNext({ dataset: s.dataset }, s.log, s.clock.nowMs);
+  const name = next.physicianId === null ? null : (d.ledger.find((e) => e.physicianId === next.physicianId)?.name ?? null);
+  return { physicianId: next.physicianId, name, why: next.why, spent, escalationSuggested: next.physicianId === null };
 }
 
 // ------------------------------------------------------------------ /state rows

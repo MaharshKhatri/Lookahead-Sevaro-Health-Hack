@@ -14,7 +14,7 @@ import { Button, Chip, cx } from './ui';
  * GET /api/offers/:id and a live countdown (sim clock) to expiry.
  */
 
-export function PhoneOffer({ offerId, initial }: { readonly offerId: string; readonly initial: PublicOfferDTO | null }) {
+export function PhoneOffer({ offerId, token, initial }: { readonly offerId: string; readonly token: string | null; readonly initial: PublicOfferDTO | null }) {
   const [offer, setOffer] = useState(initial);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [tick, setTick] = useState(0);
@@ -23,14 +23,15 @@ export function PhoneOffer({ offerId, initial }: { readonly offerId: string; rea
   const alive = useRef(true);
 
   const load = useCallback(() => {
-    void fetch(`/api/offers/${encodeURIComponent(offerId)}`, { cache: 'no-store' }).then(async (r) => {
+    if (token === null) return;
+    void fetch(`/api/offers/${encodeURIComponent(offerId)}?t=${encodeURIComponent(token)}`, { cache: 'no-store' }).then(async (r) => {
       if (!alive.current) return;
       if (r.ok) {
         setOffer((await r.json()) as PublicOfferDTO);
         setFetchedAt(Date.now());
       } else setOffer(null);
     });
-  }, [offerId]);
+  }, [offerId, token]);
 
   useEffect(() => {
     alive.current = true;
@@ -57,7 +58,7 @@ export function PhoneOffer({ offerId, initial }: { readonly offerId: string; rea
       const r = await fetch('/api/commands', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-lookahead-role': 'physician', 'x-lookahead-actor-id': offer.physicianId },
-        body: JSON.stringify({ command: { type: 'respond', offerId, response, commandId: newCommandId() } }),
+        body: JSON.stringify({ command: { type: 'respond', offerId, response, commandId: newCommandId() }, token }),
       });
       const b = (await r.json()) as CommandResponse;
       if (!b.ok) setError(plainError(b.code, b.message));

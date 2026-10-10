@@ -17,6 +17,10 @@ export const ERROR_TEXT: Readonly<Record<string, string>> = {
   UNKNOWN_OFFER: 'Unknown offer.',
   NEED_ALREADY_FILLED: 'That gap is already filled by an accepted offer.',
   BAD_REQUEST: 'The request was malformed.',
+  PIN_REQUIRED: 'Enter the clinical lead PIN first.',
+  BAD_TOKEN: 'This offer link is not valid.',
+  BAD_DATASET: 'That dataset does not ingest.',
+  UNKNOWN_STAGE: 'That upload is no longer available; upload again.',
   NOT_FOUND: 'Not found.',
   INTERNAL: 'Server error.',
 };
@@ -35,6 +39,10 @@ export const ERROR_STATUS: Readonly<Record<string, number>> = {
   UNKNOWN_OFFER: 404,
   NEED_ALREADY_FILLED: 409,
   BAD_REQUEST: 400,
+  PIN_REQUIRED: 401,
+  BAD_TOKEN: 403,
+  BAD_DATASET: 422,
+  UNKNOWN_STAGE: 404,
   NOT_FOUND: 404,
   INTERNAL: 500,
 };

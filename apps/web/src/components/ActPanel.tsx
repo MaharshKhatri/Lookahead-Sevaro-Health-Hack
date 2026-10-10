@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { OfferDTO, RecStepDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { LedgerTab, OffersTab, TrapTab, WhatIfTab } from './ActTabs';
+import { Explain } from './Explain';
 import { useLive } from './live';
 import { Button, Chip, Panel, StatusPill, cx, shortName } from './ui';
 
@@ -54,10 +55,26 @@ function OfferStep({ view, live, onProposed }: { readonly view: ViewDTO; readonl
       </Step>
     );
   }
-  if (rec === null) {
+  const next = view.nextOffer;
+  if (next.escalationSuggested) {
+    const last = next.spent.at(-1);
+    return (
+      <Step n={3} tone="critical" last title="Split-shift offer → no next eligible physician">
+        <div data-testid="escalation-suggested">
+          {last !== undefined && (
+            <>
+              {last.name}&apos;s offer was <span className="font-semibold text-text">{last.status}</span>; the engine does not re-offer them for the same need (OQ-43) and nobody else passes every rule.{' '}
+            </>
+          )}
+          <span className="font-semibold text-warning">Escalation suggested:</span> keep it with the clinical lead (step 2).
+        </div>
+      </Step>
+    );
+  }
+  if (rec === null || (next.physicianId !== null && next.physicianId !== rec.physicianId)) {
     return (
       <Step n={3} last title="Split-shift offer">
-        No off-shift physician passes every rule right now; see LEDGER for each exclusion. Keep the escalation with the clinical lead.
+        {next.physicianId !== null && next.name !== null ? `Next candidate: ${next.name}; see LEDGER for the window.` : 'No off-shift physician passes every rule right now; see LEDGER for each exclusion. Keep the escalation with the clinical lead.'}
       </Step>
     );
   }
@@ -127,7 +144,8 @@ export function ActPanel({ view }: { readonly view: ViewDTO }) {
             <p className="text-muted">Nothing to recommend at this instant.</p>
           ) : (
             <>
-              <h3 className="mb-3 text-[17px] font-semibold leading-snug">{rec.headline}</h3>
+              <h3 className="mb-2 text-[17px] font-semibold leading-snug">{rec.headline}</h3>
+              <Explain kind="recommendation" id={rec.attentionItemId} className="mb-3" />
               <ol>
                 <Step n={1} tone={reassign !== undefined && reassign.candidates.length === 0 ? 'critical' : 'accent'} title={reassign === undefined ? 'Reassign' : reassign.candidates.length === 0 ? 'Reassign → no routable candidate' : `Reassign → ${reassign.candidates[0]?.physicianId}`}>
                   {reassign === undefined ? (
@@ -149,13 +167,13 @@ export function ActPanel({ view }: { readonly view: ViewDTO }) {
                     </>
                   )}
                 </Step>
-                <Step n={2} tone={escalation?.authorizedAtMs !== null && escalation !== undefined ? 'ok' : 'accent'} title="Escalate to the clinical lead">
+                <Step n={2} tone={escalation?.authorizedAtMs !== null && escalation !== undefined ? 'ok' : view.nextOffer.escalationSuggested ? 'critical' : 'accent'} title={view.nextOffer.escalationSuggested && escalation === undefined ? 'Escalate to the clinical lead (suggested)' : 'Escalate to the clinical lead'}>
                   <div>{escalate?.summary ?? 'The clinical lead authorizes escalations and approves split-shift offers.'}</div>
                   <div className="mt-1.5 flex items-center gap-2">
                     {escalation === undefined ? (
                       <Button
                         size="sm"
-                        tone="muted"
+                        tone={view.nextOffer.escalationSuggested ? 'accent' : 'muted'}
                         testId="raise-escalation"
                         disabled={role !== 'coordinator'}
                         title={role !== 'coordinator' ? 'The coordinator raises escalations' : 'Raise to the clinical lead on duty'}

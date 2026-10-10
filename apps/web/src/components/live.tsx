@@ -118,7 +118,14 @@ export function LiveProvider({ initial, fixedRole, children }: { readonly initia
     if (fixedRole !== undefined) return;
     try {
       const saved = window.localStorage.getItem(ROLE_KEY);
-      if (saved === 'coordinator' || saved === 'clinical_lead') setRoleState(saved);
+      if (saved === 'coordinator') setRoleState(saved);
+      // Clinical lead only if this browser still holds the lead PIN cookie (OQ-44).
+      if (saved === 'clinical_lead')
+        void fetch('/api/auth/lead', { cache: 'no-store' })
+          .then((r) => r.json() as Promise<{ lead?: boolean }>)
+          .then((b) => {
+            if (b.lead === true) setRoleState('clinical_lead');
+          });
     } catch {
       // storage unavailable: keep the default role
     }

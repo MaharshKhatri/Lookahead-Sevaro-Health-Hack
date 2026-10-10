@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { AttentionDTO } from '@/lib/dto';
 import { relMinutes } from '@/lib/format';
+import { Explain } from './Explain';
 import { EvidenceChip, Panel, SeverityChip, StrokeTag, cx } from './ui';
 
 /**
@@ -86,6 +87,7 @@ function Card({ item, top, open, onToggle }: { readonly item: AttentionDTO; read
             ))}
           </ul>
           <ScoreBar item={item} />
+          <Explain kind="attention" id={item.id} />
           <div className="flex flex-wrap gap-1.5">
             {item.because.map((e) => (
               <EvidenceChip key={e.eventId} e={e} />

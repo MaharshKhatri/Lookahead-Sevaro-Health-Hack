@@ -307,3 +307,77 @@ export const OFFER_CANCEL_ROLES: readonly ('coordinator' | 'clinical_lead')[] = 
  * the coordinator may still propose them explicitly.
  */
 export const REOFFER_AFTER_DECLINE = false;
+
+/**
+ * OQ-45: schema-adaptive ingestion of a judge-supplied data package. A
+ * header that is not the exact column name is matched, in order, by an
+ * explicit mapping.json override, by normalized equality (case and
+ * punctuation ignored: "Event time" = event_time), by the aliases below, then
+ * by a unique prefix of at least HEADER_PREFIX_MIN_LENGTH characters. Aliases
+ * are the column headers the brief itself prints for these tables (event
+ * stream excerpt, reference snapshots, off-shift roster, credentialing
+ * matrix), so a package laid out like the brief's tables ingests. Every match
+ * is reported with its method; fuzzy (edit-distance) matches are only ever
+ * suggestions, never applied.
+ */
+export const HEADER_ALIASES: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  events: {
+    event_id: ['Event', 'Event ID'],
+    event_time: ['Event time'],
+    ingested_at: ['Ingested', 'Ingested at'],
+    consult_id: ['Consult', 'Consult ID'],
+    event_type: ['Type', 'Event type'],
+    physician_id: ['Phys.', 'Physician', 'Physician ID'],
+    hospital_id: ['Hosp.', 'Hospital', 'Hospital ID'],
+    description: ['Description'],
+  },
+  hospitals: { hospital_id: ['ID', 'Hospital ID'], hospital_name: ['Hospital', 'Name'], local_timezone: ['Time zone', 'Timezone'], coverage_tier: ['Tier', 'Coverage tier'] },
+  physiciansOnShift: { physician_id: ['ID', 'Physician ID'], name: ['Physician'], shift_start_et: ['Shift start'], shift_end_et: ['Shift end'], split_shift_opt_in: ['Opt-in'] },
+  offShiftRoster: {
+    physician_id: ['ID', 'Physician ID'],
+    name: ['Physician'],
+    split_shift_opt_in: ['Opt-in'],
+    last_shift_end: ['Last shift ended'],
+    next_shift_start: ['Next shift starts'],
+    hours_worked_last_7d: ['Hrs 7d'],
+    est_minutes_to_online: ['Min to online'],
+    preferred_channel: ['Channel'],
+    offers_declined_last_30d: ['Declined 30d'],
+  },
+  credentials: { physician_id: ['ID', 'Physician ID'], name: ['Physician'] },
+  baselineHourly: { hospital_id: ['Hospital ID', 'Hosp.'], hospital_name: ['Hospital'], hour_start_et: ['Hour'], mean_consults: ['Mean'], p90_consults: ['p90'] },
+  coverageRequirements: { hospital_id: ['Hospital ID', 'Hosp.'], hospital_name: ['Hospital'], time_block_et: ['Time block', 'Block'], min_available_credentialed_physicians: ['Minimum', 'Min available'] },
+  snapshotPhysicians: {
+    physician_id: ['ID'],
+    name: ['Physician'],
+    shift_et: ['Shift (ET)', 'Shift'],
+    self_reported_status: ['Self-reported'],
+    desktop_agent: ['Agent'],
+    derived_state: ['Derived state'],
+    consults_this_shift: ['Cons.'],
+    calls_this_shift: ['Calls'],
+    open_consults: ['Open'],
+    minutes_to_shift_end: ['Min to end'],
+  },
+  snapshotConsults: {
+    consult_id: ['Consult'],
+    hospital_id: ['Hosp.', 'Hospital ID'],
+    hospital_name: ['Hospital'],
+    physician_id: ['Physician', 'Phys.'],
+    consult_type: ['Type'],
+    current_stage: ['Current stage'],
+    stage_entered_at: ['Entered'],
+    minutes_in_stage: ['Min in stage'],
+    minutes_since_received: ['Min since received'],
+  },
+};
+export const HEADER_PREFIX_MIN_LENGTH = 3;
+/** OQ-45: a file whose name is not recognised is assigned to the kind whose columns its headers resolve best, if at least this share resolves. */
+export const FILE_KIND_MIN_HEADER_SCORE = 0.6;
+
+/**
+ * OQ-46: the console's "no new Sevaro events" banner appears only when the
+ * sim clock is more than this far past the last ingested event (a normal
+ * gap between events is not a stale feed).
+ */
+export const QUIET_FEED_BANNER_MS = 120_000;

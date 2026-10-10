@@ -1,5 +1,5 @@
 import { guard, json, readJson } from '@/server/http';
-import { StoreError, getStore } from '@/server/store';
+import { StoreError, getReadyStore } from '@/server/store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,7 +14,7 @@ export function POST(req: Request): Promise<Response> {
     const type = req.headers.get('content-type') ?? '';
     const text = type.includes('application/json') ? (await readJson(req)).text : await req.text();
     if (typeof text !== 'string' || text.trim() === '') throw new StoreError('BAD_REQUEST', 'send event_stream.csv rows as text/csv or JSON {"text": "..."}');
-    const r = await getStore().inject(text);
+    const r = await (await getReadyStore()).inject(text);
     return json({ ok: r.rejected.length === 0, ...r });
   });
 }

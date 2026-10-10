@@ -1,4 +1,4 @@
-import { getStore, type StoreEvent } from '@/server/store';
+import { getReadyStore, type StoreEvent } from '@/server/store';
 import { errorJson } from '@/server/http';
 
 export const dynamic = 'force-dynamic';
@@ -11,9 +11,9 @@ const HEARTBEAT_MS = 15_000;
  * /api/view when the version changes (debounced 200 ms). A comment heartbeat
  * every 15 s keeps proxies from closing the connection.
  */
-export function GET(req: Request): Response {
+export async function GET(req: Request): Promise<Response> {
   try {
-    const store = getStore();
+    const store = await getReadyStore();
     const encoder = new TextEncoder();
     let cleanup = () => {};
     const stream = new ReadableStream<Uint8Array>({

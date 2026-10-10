@@ -58,7 +58,7 @@ describe('nextId', () => {
 
 describe('sim clock play loop', () => {
   it('advances speed x step per real step and materializes ticks; pause stops it', async () => {
-    const store = new Store({ data: DATA_DIR, live: LIVE_DIR }, 20);
+    const store = new Store({ data: DATA_DIR, live: LIVE_DIR }, { playStepMs: 20 });
     await store.reset();
     const start = store.snapshot().clock.nowMs;
     await store.moveClock({ action: 'play', speed: 60 });

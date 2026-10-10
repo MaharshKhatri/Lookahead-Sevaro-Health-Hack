@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand, type ActContext, type ActionLog, type Command } from '../src';
 import { COORD, LEAD, dataset, phys } from './act.helpers';
+import { expectWithinBudget } from './bench.helpers';
 import { et, seededShuffle } from './helpers';
-
-const SKIP = process.env.LOOKAHEAD_SKIP_BENCH === '1';
 
 function loop(c: ActContext): ActionLog {
   const steps: [Command, string][] = [[{ type: 'proposeOffer', commandId: 'p', actor: COORD, physicianId: 'PHY-009' }, '18:21:00']];
@@ -46,11 +45,7 @@ describe('Act layer determinism and performance (CLAUDE.md rule 3)', () => {
     }
     const median = (xs: number[]) => [...xs].sort((x, y) => x - y)[Math.floor(xs.length / 2)] ?? Number.NaN;
     console.log(`applyCommand timing (median of 9): propose ${median(proposeTimes).toFixed(1)} ms, accept ${median(acceptTimes).toFixed(1)} ms`);
-    if (SKIP) {
-      console.log('LOOKAHEAD_SKIP_BENCH=1: timing threshold not enforced');
-      return;
-    }
-    expect(median(proposeTimes)).toBeLessThan(60);
-    expect(median(acceptTimes)).toBeLessThan(60);
+    expectWithinBudget('applyCommand propose (median of 9)', median(proposeTimes), 60);
+    expectWithinBudget('applyCommand accept (median of 9)', median(acceptTimes), 60);
   });
 });

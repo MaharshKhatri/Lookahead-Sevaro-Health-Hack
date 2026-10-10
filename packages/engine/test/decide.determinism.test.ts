@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { decide, type DecisionReport } from '../src';
 import { dataset } from './decide.helpers';
+import { expectWithinBudget } from './bench.helpers';
 import { et, seededShuffle } from './helpers';
 
-const SKIP = process.env.LOOKAHEAD_SKIP_BENCH === '1';
 const view = (r: DecisionReport) => ({
   needs: r.needs,
   ledger: r.ledger,
@@ -31,12 +31,7 @@ describe('decide() is pure and deterministic (CLAUDE.md rule 3)', () => {
       return performance.now() - t0;
     }).sort((a, b) => a - b);
     const median = times[7] ?? Number.NaN;
-    console.log(`decide timing (median of 15): ${median.toFixed(1)} ms`);
-    if (SKIP) {
-      console.log('LOOKAHEAD_SKIP_BENCH=1: timing threshold not enforced');
-      return;
-    }
-    expect(median).toBeLessThan(40);
+    expectWithinBudget('decide timing (median of 15)', median, 40);
   });
 
   it('runs at other instants without throwing (no offer is a valid outcome)', () => {

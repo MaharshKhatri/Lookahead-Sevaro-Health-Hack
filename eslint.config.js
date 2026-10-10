@@ -1,12 +1,13 @@
 import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 const IO_MODULES = ['fs', 'fs/promises', 'path', 'http', 'https', 'net', 'child_process'].flatMap((m) => [m, `node:${m}`]);
 
 export default defineConfig(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', 'data/**', 'docs/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', 'data/**', 'docs/**', 'apps/web/.next/**', 'apps/web/next-env.d.ts', 'apps/web/test-results/**', 'apps/web/playwright-report/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   { languageOptions: { globals: globals.node } },
@@ -27,4 +28,11 @@ export default defineConfig(
     },
   },
   { files: ['packages/engine/src/data/loaders.ts'], rules: { 'no-restricted-imports': 'off' } },
+  {
+    // Web app (Session 6): hooks correctness; browser globals for client components.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'error' },
+  },
 );

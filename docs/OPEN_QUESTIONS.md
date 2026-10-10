@@ -377,3 +377,9 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Default:** `REOFFER_AFTER_DECLINE = false`. `recommendNext` skips a physician who declined, let expire, or was rejected for an overlapping need. Advisory only: the coordinator may still propose them explicitly.
 - **Effect at 18:24:** after PHY-009 declines, there is no next candidate, so the escalation stays with the clinical lead.
 
+
+### OQ-44 Who is acting, in the demo
+- **Brief:** "Any message to a physician outside their shift requires a human approval in the demo"; the off-shift physician can "Accept or decline from a phone; nothing else". Real scheduling and messaging systems are out of scope; the brief says nothing about authentication.
+- **Default (apps/web, D-66):** no login. The client names its role in `x-lookahead-role` (coordinator, clinical_lead, physician) and its id in `x-lookahead-actor-id`; the engine's `COMMAND_ROLES` decides what that role may do, and `respond` succeeds only when the actor id is the offer's physician (NOT_OWN_OFFER otherwise). The phone view `/offer/[id]` acts as the offer's physician. `system` is reserved for the server (clock ticks).
+- **Consequence:** anyone who can reach the server can act as any role. Acceptable for a synthetic-data demo; a deployment needs real identity (SSO for staff, signed one-time links for physicians).
+- **Verify:** `apps/web/test/routes.test.ts` (role errors, NOT_OWN_OFFER).

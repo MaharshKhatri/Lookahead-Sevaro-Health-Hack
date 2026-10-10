@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/*
+ * Lookahead ops console design tokens (Session 6 spec; use exactly).
+ * Status is never color-only: every chip carries a word.
+ */
+@theme {
+  --color-bg: #0b1320;
+  --color-panel: #121c2e;
+  --color-raised: #1a2740;
+  --color-border: #263552;
+  --color-text: #e8eef5;
+  --color-muted: #93a4b8;
+  --color-accent: #2bb3a3;
+  --color-critical: #f2555a;
+  --color-warning: #f5a524;
+  --color-ok: #3fb68b;
+  --color-info: #6ea8fe;
+
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  font-size: 16px;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* IDs, times and numbers: IBM Plex Mono with tabular figures. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+/* Thin scrollbars for the dense console panes. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+/* Non-color cues for coverage classes (accessibility: never color-only). */
+.pat-hard-gap {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(242 85 90 / 0.18) 6px 8px);
+}
+.pat-deadlock {
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgb(242 85 90 / 0.28) 5px 7px),
+    repeating-linear-gradient(135deg, transparent 0 5px, rgb(242 85 90 / 0.28) 5px 7px);
+}
+.pat-at-risk {
+  background-image: radial-gradient(rgb(245 165 36 / 0.35) 1px, transparent 1.5px);
+  background-size: 6px 6px;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(242 85 90 / 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgb(242 85 90 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(242 85 90 / 0);
+  }
+}
+.pulse-critical {
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-critical {
+    animation: none;
+  }
+}

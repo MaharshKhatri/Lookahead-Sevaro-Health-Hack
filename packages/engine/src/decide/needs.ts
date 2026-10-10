@@ -25,7 +25,7 @@ export function computeNeeds(detection: DetectionReport, decisionCoverage: Cover
 }
 
 const kindOrder = (k: NeedKind) => (k === 'DEADLOCK_NOW' ? 0 : k === 'HARD_GAP' ? 1 : 2);
-const needId = (kind: NeedKind, hospitalId: string, startMs: EpochMs) => `need-${fnv1a(`${kind}|${hospitalId}|${startMs}`)}`;
+const needId = (kind: NeedKind, hospitalId: string, key: EpochMs | string) => `need-${fnv1a(`${kind}|${hospitalId}|${key}`)}`;
 
 /** One DEADLOCK_NOW per hospital with deadlocked consults; ends at the first known relief (OQ-32). */
 function deadlockNeeds(detection: DetectionReport, coverage: CoverageProjection, staffing: StaffingModel): Need[] {
@@ -44,7 +44,8 @@ function deadlockNeeds(detection: DetectionReport, coverage: CoverageProjection,
         ? `No arrival or offer credentialed here is known; window set to ${DEADLOCK_DEFAULT_WINDOW_MIN} min (OQ-32).`
         : `Relief expected at ${etClock(relief.startMs)} ET: ${relief.physicianId} (${relief.source === 'split_shift_offer' ? 'accepted split-shift offer' : 'scheduled arrival'}, ${relief.confirmation}) is credentialed here (OQ-32).`;
     return {
-      id: needId('DEADLOCK_NOW', hospitalId, detection.nowMs),
+      // Keyed by the deadlocked consults, not by now, so the id is stable across instants (Act layer refers to it).
+      id: needId('DEADLOCK_NOW', hospitalId, [...consultIds].sort(compareIds).join(',')),
       kind: 'DEADLOCK_NOW',
       hospitalId,
       hospitalName: name,

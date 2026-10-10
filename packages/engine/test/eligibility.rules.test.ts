@@ -123,3 +123,27 @@ describe('OQ-34 ranking: value desc, then time to online, then fewer declines', 
     expect(H).toBe(60 * M);
   });
 });
+
+describe('brief "Act" + eligibility rules 4-5: an accepted split shift is a scheduled shift with hours', () => {
+  const ledgerWith = (startHms: string, endHms: string) =>
+    buildLedger({
+      detection: r.detection,
+      roster: [base],
+      needs: r.needs,
+      decisionHorizonEndMs: r.decisionCoverage.horizonEndMs,
+      offerLog: [],
+      acceptedOffers: [{ physicianId: 'PHY-009', name: base.name, startMs: et(startHms), endMs: et(endHms), scopeHospitalIds: ['SYN-005'], seededConsultCount: 14 }],
+    })[0] as LedgerEntry;
+
+  it('a later accepted shift (21:00-23:00) caps the window (rule 5 room 145 min) and adds 2 h to the 60-h count (rule 4)', () => {
+    const e = ledgerWith('21:00:00', '23:00:00');
+    expect(rule(e, 'ELIG_NO_SCHEDULE_OVERLAP')).toMatchObject({ pass: true });
+    expect(rule(e, 'ELIG_NO_SCHEDULE_OVERLAP')?.detail).toMatch(/^accepted split shift 03-17 21:00 ET starts 2\.4 h after offered start 18:35/);
+    expect(e.offerWindow).toMatchObject({ endMs: et('21:00:00'), bindingCap: 'next_scheduled_shift' });
+    expect(rule(e, 'ELIG_HOURS_60')?.detail).toMatch(/^38 h \(36 h \+ 2 h accepted split shift\) \+ offered 2\.4 h = 40\.4 h <= 60/);
+  });
+
+  it('an accepted shift containing the offered start fails rule 5', () => {
+    expect(rule(ledgerWith('18:30:00', '20:30:00'), 'ELIG_NO_SCHEDULE_OVERLAP')).toMatchObject({ pass: false, detail: 'offered start 18:35 falls inside an accepted split shift 18:30-20:30 ET' });
+  });
+});

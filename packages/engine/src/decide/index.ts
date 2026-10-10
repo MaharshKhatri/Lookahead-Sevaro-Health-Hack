@@ -21,6 +21,8 @@ import { compareNeeds, introducedNeeds, needsOverDecisionHorizon, projectWithOff
 export interface DecideOptions {
   /** Offers already sent (Session 5 owns the state machine); feeds the safety-constraint rules. */
   readonly offerLog?: readonly OfferLogEntry[];
+  /** Accepted split-shift offers (Act layer): staffed, scoped and seeded from their start (brief "Act"). */
+  readonly acceptedOffers?: readonly AcceptedOffer[];
   /** Detection horizon (default PROJECTION_HORIZON_MIN). Needs must start inside it. */
   readonly horizonMin?: number;
   readonly stepMin?: number;
@@ -56,7 +58,7 @@ export interface DecisionReport {
 }
 
 export function decide(dataset: Dataset, nowMs: EpochMs, opts: DecideOptions = {}): DecisionReport {
-  const detection = detect(dataset, nowMs, { horizonMin: opts.horizonMin ?? PROJECTION_HORIZON_MIN, stepMin: opts.stepMin ?? PROJECTION_STEP_MIN });
+  const detection = detect(dataset, nowMs, { horizonMin: opts.horizonMin ?? PROJECTION_HORIZON_MIN, stepMin: opts.stepMin ?? PROJECTION_STEP_MIN, acceptedOffers: opts.acceptedOffers ?? [] });
   const decisionHorizonMin = Math.max(opts.decisionHorizonMin ?? DECISION_HORIZON_MIN, detection.horizonMin);
   const decisionCoverage = projectCoverage(
     dataset,
@@ -68,7 +70,7 @@ export function decide(dataset: Dataset, nowMs: EpochMs, opts: DecideOptions = {
     detection.routability,
   );
   const needs = computeNeeds(detection, decisionCoverage, detection.staffing);
-  const ledger = buildLedger({ detection, roster: dataset.offShiftRoster, needs, decisionHorizonEndMs: decisionCoverage.horizonEndMs, offerLog: opts.offerLog ?? [] });
+  const ledger = buildLedger({ detection, roster: dataset.offShiftRoster, needs, decisionHorizonEndMs: decisionCoverage.horizonEndMs, offerLog: opts.offerLog ?? [], acceptedOffers: opts.acceptedOffers ?? [] });
   const recommendedOffer = recommend(detection, ledger);
   const offers: AcceptedOffer[] =
     recommendedOffer === null
@@ -107,26 +109,36 @@ export function decide(dataset: Dataset, nowMs: EpochMs, opts: DecideOptions = {
 /** The top-ranked eligible physician, with the OQ-35 mitigations and the PHI-checked message. */
 function recommend(detection: DetectionReport, ledger: readonly LedgerEntry[]): RecommendedOffer | null {
   const top = ledger.filter((e) => e.rank !== null).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))[0];
-  if (top === undefined || top.offerWindow === null || top.value === null) return null;
-  const trap = analyzeTrap(detection, { physicianId: top.physicianId, startMs: top.offerWindow.startMs, scopeHospitalIds: top.scopeHospitalIds, source: 'split_shift_offer' });
-  const routingScope = trap.recommended === 'seed' ? trap.credentialedHospitalIds : top.scopeHospitalIds;
+  return top === undefined ? null : offerFromEntry(detection, ledger, top);
+}
+
+/**
+ * The offer for one eligible ledger entry: window from the ledger, SCOPE and
+ * SEED from the trap analysis (OQ-35), message drafted and PHI-checked (brief
+ * "Notification and Safety Constraints"). Null when the entry is not eligible.
+ */
+export function offerFromEntry(detection: DetectionReport, ledger: readonly LedgerEntry[], entry: LedgerEntry): RecommendedOffer | null {
+  const w = entry.offerWindow;
+  if (!entry.eligible || w === null || entry.value === null) return null;
+  const trap = analyzeTrap(detection, { physicianId: entry.physicianId, startMs: w.startMs, scopeHospitalIds: entry.scopeHospitalIds, source: 'split_shift_offer' });
+  const routingScope = trap.recommended === 'seed' ? trap.credentialedHospitalIds : entry.scopeHospitalIds;
   const seededConsultCount = trap.recommended === 'scope' ? 0 : trap.seededConsultCount;
   const names = routingScope.map((h) => detection.staffing.hospitalNames.get(h) ?? h);
   return {
-    physicianId: top.physicianId,
-    name: top.name,
-    window: top.offerWindow,
+    physicianId: entry.physicianId,
+    name: entry.name,
+    window: w,
     routingScope,
     seededConsultCount,
-    value: top.value,
-    coversNeeds: top.coversNeeds,
+    value: entry.value,
+    coversNeeds: entry.coversNeeds,
     why: [
-      `Rank 1 of ${ledger.filter((e) => e.eligible).length} eligible (of ${ledger.length} off-shift physicians): passes all six eligibility rules and the offer limits.`,
-      ...top.rankWhy,
-      `Window binding cap: ${top.offerWindow.caps.find((c) => c.kind === top.offerWindow?.bindingCap)?.detail ?? top.offerWindow.bindingCap}.`,
+      `Rank ${entry.rank ?? '-'} of ${ledger.filter((e) => e.eligible).length} eligible (of ${ledger.length} off-shift physicians): passes all six eligibility rules and the offer limits.`,
+      ...entry.rankWhy,
+      `Window binding cap: ${w.caps.find((c) => c.kind === w.bindingCap)?.detail ?? w.bindingCap}.`,
       ...trap.trapWhy,
     ],
-    message: draftOfferMessage({ hospitalNames: names, startMs: top.offerWindow.startMs, endMs: top.offerWindow.endMs }),
+    message: draftOfferMessage({ hospitalNames: names, startMs: w.startMs, endMs: w.endMs }),
     trap,
   };
 }
@@ -140,7 +152,7 @@ function arrivalTraps(detection: DetectionReport, horizonEndMs: EpochMs): TrapAn
 
 export { DECISION_RIGHTS, type Actor, type InterventionKind } from './brief-rules';
 export { computeNeeds, gapHospitalsOf, needEndMs } from './needs';
-export { buildLedger, type LedgerContext } from './eligibility';
+export { buildLedger, isoWeekStartEt, type LedgerContext } from './eligibility';
 export { analyzeTrap, medianFloor, type Joiner } from './trap';
 export { buildInterventions, recommendForTopIssue, type InterventionContext } from './interventions';
 export { projectWithOffers, projectWithOffersFrom, compareNeeds, introducedNeeds, needsOverDecisionHorizon, type AcceptedOffer, type NeedChange, type RoutableAt, type WhatIf } from './whatif';

@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import type { DetectionReport } from '../detect';
+import type { AcceptedOffer } from '../detect/staffing';
 import { etClock } from '../detect/staffing';
 import { MAX_OFFER_HOURS, NEED_VALUE_WEIGHTS, WEEKLY_OFFER_COUNT_SOURCE } from '../policy';
 import { compareIds } from '../replay/derive';
@@ -25,6 +26,8 @@ export interface LedgerContext {
   readonly needs: readonly Need[];
   readonly decisionHorizonEndMs: EpochMs;
   readonly offerLog: readonly OfferLogEntry[];
+  /** Accepted split-shift offers: scheduled shifts for rule 5 and hours for rule 4 (brief "Act"). */
+  readonly acceptedOffers?: readonly AcceptedOffer[];
 }
 
 const HOUR = 3_600_000;
@@ -62,16 +65,20 @@ function evaluatePhysician(ctx: LedgerContext, r: OffShiftPhysician): LedgerEntr
   const covered = ctx.needs.filter((n) => n.qualifiesForOffers && credentials.has(n.hospitalId));
   const scope = [...new Set(covered.map((n) => n.hospitalId))].sort(compareIds);
   const startMs = nowMs + r.estMinutesToOnline * MIN;
-  const headroomMs = (MAX_HOURS_7D - r.hoursWorkedLast7d) * HOUR;
+  // Accepted split shifts are shifts "they are already scheduled for" (rule 5) and hours worked (rule 4, OQ-20).
+  const booked = (ctx.acceptedOffers ?? []).filter((o) => o.physicianId === r.physicianId && o.endMs > nowMs);
+  const bookedHours = booked.reduce((h, o) => h + (o.endMs - o.startMs) / HOUR, 0);
+  const headroomMs = (MAX_HOURS_7D - r.hoursWorkedLast7d - bookedHours) * HOUR;
+  const schedule = scheduleAfter(r, booked, startMs);
   const needsEnd = covered.length === 0 ? null : Math.max(...covered.map((n) => needEndMs(n, ctx.decisionHorizonEndMs)));
-  const window = needsEnd === null ? null : offerWindow(nowMs, startMs, r, needsEnd, headroomMs, ctx.decisionHorizonEndMs);
+  const window = needsEnd === null ? null : offerWindow(nowMs, startMs, r, schedule, needsEnd, headroomMs, ctx.decisionHorizonEndMs);
 
   const rules: EligibilityRule[] = [
     optInRule(r),
     credentialRule(ctx, credentials, covered, scope),
     restRule(r, startMs),
-    hoursRule(r, headroomMs, window),
-    overlapRule(r, startMs),
+    hoursRule(r, bookedHours, headroomMs, window),
+    overlapRule(startMs, schedule),
     minLengthRule(r, nowMs, startMs, needsEnd),
     openOfferRule(ctx, r),
     weeklyOfferRule(ctx, r, nowMs),
@@ -95,11 +102,26 @@ function evaluatePhysician(ctx: LedgerContext, r: OffShiftPhysician): LedgerEntr
 }
 
 /** Window = [now + time to online, min(needs end, start + MAX_OFFER_HOURS, next scheduled shift, start + 60-h headroom)]. */
-function offerWindow(nowMs: EpochMs, startMs: EpochMs, r: OffShiftPhysician, needsEnd: EpochMs, headroomMs: number, horizonEnd: EpochMs): OfferWindow {
+interface Schedule {
+  /** Earliest scheduled start at/after the offered start (roster next shift or an accepted split shift). */
+  readonly nextStartMs: EpochMs;
+  readonly nextLabel: string;
+  /** An accepted split shift that already contains the offered start. */
+  readonly inside: AcceptedOffer | null;
+}
+
+function scheduleAfter(r: OffShiftPhysician, booked: readonly AcceptedOffer[], startMs: EpochMs): Schedule {
+  const next = [{ atMs: r.nextShiftStart, label: `next scheduled shift ${dateTime(r.nextShiftStart)} ET` }, ...booked.map((o) => ({ atMs: o.startMs, label: `accepted split shift ${dateTime(o.startMs)} ET` }))]
+    .filter((x) => x.atMs >= startMs)
+    .sort((a, b) => a.atMs - b.atMs)[0] ?? { atMs: r.nextShiftStart, label: `next scheduled shift ${dateTime(r.nextShiftStart)} ET` };
+  return { nextStartMs: next.atMs, nextLabel: next.label, inside: booked.find((o) => o.startMs <= startMs && startMs < o.endMs) ?? null };
+}
+
+function offerWindow(nowMs: EpochMs, startMs: EpochMs, r: OffShiftPhysician, schedule: Schedule, needsEnd: EpochMs, headroomMs: number, horizonEnd: EpochMs): OfferWindow {
   const caps: WindowCap[] = [
     { kind: 'needs_end', atMs: needsEnd, detail: needsEnd >= horizonEnd ? `covered needs persist past the decision projection (${etClock(horizonEnd)} ET, OQ-31)` : `covered needs end ${etClock(needsEnd)} ET` },
     { kind: 'max_offer_hours', atMs: startMs + MAX_OFFER_HOURS * HOUR, detail: `MAX_OFFER_HOURS ${MAX_OFFER_HOURS} h after start` },
-    { kind: 'next_scheduled_shift', atMs: r.nextShiftStart, detail: `next scheduled shift ${dateTime(r.nextShiftStart)} ET (may end exactly then, OQ-21)` },
+    { kind: 'next_scheduled_shift', atMs: schedule.inside === null ? schedule.nextStartMs : startMs, detail: `${schedule.inside === null ? schedule.nextLabel : 'inside an accepted split shift'} (may end exactly then, OQ-21)` },
     { kind: 'hours_headroom', atMs: startMs + Math.max(0, headroomMs), detail: `${hrs(Math.max(0, headroomMs))} h of 60-h headroom` },
   ];
   const binding = caps.reduce((a, c) => (c.atMs < a.atMs ? c : a));
@@ -138,30 +160,36 @@ function restRule(r: OffShiftPhysician, startMs: EpochMs): EligibilityRule {
   return { rule: 'ELIG_REST_10H', pass, detail: `last shift ended ${dateTime(r.lastShiftEnd)} ET; at offered start ${etClock(startMs)} ET: ${hrs(rest)} h ${pass ? '>=' : '<'} ${MIN_REST_HOURS} h`, because: [] };
 }
 
-function hoursRule(r: OffShiftPhysician, headroomMs: number, window: OfferWindow | null): EligibilityRule {
+function hoursRule(r: OffShiftPhysician, bookedHours: number, headroomMs: number, window: OfferWindow | null): EligibilityRule {
+  const worked = r.hoursWorkedLast7d + bookedHours;
+  const booked = bookedHours > 0 ? ` (${r.hoursWorkedLast7d} h + ${hrs(bookedHours * HOUR)} h accepted split shift)` : '';
   const pass = headroomMs >= MIN_OFFER_MINUTES * MIN;
   if (!pass) {
     return {
       rule: 'ELIG_HOURS_60',
       pass,
-      detail: `${r.hoursWorkedLast7d} h + minimum ${MIN_OFFER_MINUTES / 60} h offer = ${r.hoursWorkedLast7d + MIN_OFFER_MINUTES / 60} h > ${MAX_HOURS_7D} (headroom ${hrs(Math.max(0, headroomMs))} h)`,
+      detail: `${hrs(worked * HOUR)} h${booked} + minimum ${MIN_OFFER_MINUTES / 60} h offer = ${hrs((worked + MIN_OFFER_MINUTES / 60) * HOUR)} h > ${MAX_HOURS_7D} (headroom ${hrs(Math.max(0, headroomMs))} h)`,
       because: [],
     };
   }
   const offered = window === null ? null : (window.endMs - window.startMs) / HOUR;
   const detail =
     offered === null
-      ? `${r.hoursWorkedLast7d} h worked; headroom ${hrs(headroomMs)} h >= ${MIN_OFFER_MINUTES / 60} h`
-      : `${r.hoursWorkedLast7d} h + offered ${hrs(offered * HOUR)} h = ${hrs((r.hoursWorkedLast7d + offered) * HOUR)} h <= ${MAX_HOURS_7D} (headroom ${hrs(headroomMs)} h before, ${hrs(headroomMs - offered * HOUR)} h after; OQ-20)`;
+      ? `${hrs(worked * HOUR)} h worked${booked}; headroom ${hrs(headroomMs)} h >= ${MIN_OFFER_MINUTES / 60} h`
+      : `${hrs(worked * HOUR)} h${booked} + offered ${hrs(offered * HOUR)} h = ${hrs((worked + offered) * HOUR)} h <= ${MAX_HOURS_7D} (headroom ${hrs(headroomMs)} h before, ${hrs(headroomMs - offered * HOUR)} h after; OQ-20)`;
   return { rule: 'ELIG_HOURS_60', pass, detail, because: [] };
 }
 
-function overlapRule(r: OffShiftPhysician, startMs: EpochMs): EligibilityRule {
-  const room = r.nextShiftStart - startMs;
+function overlapRule(startMs: EpochMs, schedule: Schedule): EligibilityRule {
+  if (schedule.inside !== null) {
+    const o = schedule.inside;
+    return { rule: 'ELIG_NO_SCHEDULE_OVERLAP', pass: false, detail: `offered start ${etClock(startMs)} falls inside an accepted split shift ${etClock(o.startMs)}-${etClock(o.endMs)} ET`, because: [] };
+  }
+  const room = schedule.nextStartMs - startMs;
   const pass = room >= MIN_OFFER_MINUTES * MIN;
   const detail = pass
-    ? `next scheduled shift ${dateTime(r.nextShiftStart)} ET starts ${hrs(room)} h after offered start ${etClock(startMs)}; a ${MIN_OFFER_MINUTES / 60}-h offer fits (may end exactly at shift start, OQ-21)`
-    : `next scheduled shift ${dateTime(r.nextShiftStart)} ET starts ${Math.round(room / MIN)} min after offered start ${etClock(startMs)}; any ${MIN_OFFER_MINUTES / 60}-h offer would overlap it`;
+    ? `${schedule.nextLabel} starts ${hrs(room)} h after offered start ${etClock(startMs)}; a ${MIN_OFFER_MINUTES / 60}-h offer fits (may end exactly at shift start, OQ-21)`
+    : `${schedule.nextLabel} starts ${Math.round(room / MIN)} min after offered start ${etClock(startMs)}; any ${MIN_OFFER_MINUTES / 60}-h offer would overlap it`;
   return { rule: 'ELIG_NO_SCHEDULE_OVERLAP', pass, detail, because: [] };
 }
 
@@ -185,9 +213,14 @@ function openOfferRule(ctx: LedgerContext, r: OffShiftPhysician): EligibilityRul
   return { rule: 'SAFETY_ONE_OPEN_OFFER', pass: open < MAX_OPEN_OFFERS_PER_PHYSICIAN, detail: `${open} open offer(s) in the offer log (max ${MAX_OPEN_OFFERS_PER_PHYSICIAN})`, because: [] };
 }
 
+/** OQ-09: the ISO week (Monday 00:00 ET) containing nowMs. */
+export function isoWeekStartEt(nowMs: EpochMs): EpochMs {
+  return DateTime.fromMillis(nowMs, { zone: ET_ZONE }).startOf('week').toMillis();
+}
+
 /** OQ-09: offers this ISO week (Monday 00:00 ET) from our own offer log. */
 function weeklyOfferRule(ctx: LedgerContext, r: OffShiftPhysician, nowMs: EpochMs): EligibilityRule {
-  const weekStart = DateTime.fromMillis(nowMs, { zone: ET_ZONE }).startOf('week').toMillis();
+  const weekStart = isoWeekStartEt(nowMs);
   const sent = ctx.offerLog.filter((o) => o.physicianId === r.physicianId && o.sentMs >= weekStart && o.sentMs <= nowMs).length;
   return {
     rule: 'SAFETY_THREE_OFFERS_PER_WEEK',

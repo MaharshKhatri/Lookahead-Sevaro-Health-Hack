@@ -235,3 +235,53 @@ Decision rights follow brief "Users and Decision Rights":
 
 **D-52 Performance.** `decide` at 18:20 takes about 17–19 ms median (detect about 8 ms, plus a second 300-min projection, the what-if projection, and the ledger and interventions), against a 40 ms target (`test/decide.determinism.test.ts`). The output is identical across 20 seeded shuffles of the event order. `pnpm report:decide` renders `docs/DECIDE_1820.md`.
 
+## Session 5: act layer, closed loop (2026-10-10)
+
+**D-53 Action log.** `src/act/log.ts` keeps an append-only, frozen array of `ActionEvent {actionId, seq, atMs, actor {role, id}, commandId, type, payload}`. It is separate from Sevaro's event stream: no command reads or writes `dataset.events`, and replay ignores the log (`test/isolation.test.ts`: still 8/8 and 18/18).
+- `actionId` is an FNV-1a hash of `commandId#index`.
+- `seq` is 1-based; `expectedSeq` gives optimistic concurrency (CONFLICT on mismatch).
+- `actionsKnownAt(log, now)` returns events with `atMs ≤ now`.
+- The sim clock must not run backwards (INVALID_STATE).
+- 14 event types, as specified.
+
+**D-54 Pure command processor.** `applyCommand(ctx, log, command, nowMs)` returns either `{ok, log', emitted, replayed, coverage}` or `{ok: false, code, message}`. The 12 error codes form a closed union.
+- **Roles:** `COMMAND_ROLES` is derived from `DECISION_RIGHTS`. Cancel follows OQ-42. Internal alerts may come from the system or the coordinator; only system alerts are marked automated ("Automated actions are permitted only for low-risk steps").
+- **Idempotency:** a commandId already in the log returns its original events and appends nothing. Failed commands store nothing, so their retry is evaluated afresh. The action log is an audit of what happened; refusals are returned to the caller, not logged.
+- **Decide:** `decideWithLog` calls `decide(dataset, now, {offerLog, acceptedOffers})` from the log. Each command recomputes it (about 16 ms; `applyCommand` about 16 ms median for propose and accept against a 60 ms target).
+
+**D-55 Decide extension for accepted offers.**
+- `detect`/`decide` accept `acceptedOffers`, which become scoped, seeded `split_shift_offer` shifts (`offerShift`, shared with the what-if), expected until `shift_started`.
+- The ledger treats a physician's accepted shift as a scheduled shift (rule 5: overlap, and the window cap) and adds its hours to the 60-h count (rule 4).
+- `offerFromEntry` builds the scoped, seeded, PHI-checked offer for any eligible entry; `recommend` uses it too.
+- DEADLOCK_NOW need ids are now keyed by the deadlocked consult ids instead of `now`, so an id stays stable across instants and can be passed as `needIds`.
+- Session 3/4 outputs are unchanged: `DETECT_1820.md` and `DECIDE_1820.md` regenerate byte-identical, and all earlier tests pass.
+
+**D-56 Proposal freezes everything the audit needs.** `proposeOffer` checks, in order:
+1. the physician is on the roster;
+2. caps (OPEN_OFFER_EXISTS, WEEKLY_CAP per OQ-41);
+3. `decideWithLog` at now;
+4. needs not already filled (OQ-40);
+5. eligibility from the ledger (NOT_ELIGIBLE with each failed rule's detail);
+6. the sequential conflict (OQ-37).
+
+It then freezes into `offer_proposed`:
+- the window, scope and seed (from the ledger + trap at now);
+- the value and the covered needs;
+- the full ledger (6 rows with each rule's result and detail);
+- the trap bullets, the roster channel, and the draft message.
+
+**D-57 Approval sends.** `approveOffer` (clinical lead, status `proposed`) re-checks the frozen message with the strict PHI guard (denylist + vocabulary + frozen hospital names) and fails with PHI_BLOCKED if it does not pass, with nothing emitted. Otherwise it emits `offer_approved`, then `offer_sent` and `offer_delivered` from `system:delivery-sim`, carrying the frozen message, the channel and `expiresAtMs`. Delivery is simulated.
+
+**D-58 Responses and the closed loop.** `respond` is allowed only for the offer's own physician (NOT_OWN_OFFER otherwise). A reply after expiry gets EXPIRED; cancelled or superseded gets NO_LONGER_AVAILABLE; any other state gets INVALID_STATE. Accept emits `offer_accepted` with the effective start (OQ-39) and a frozen coverage effect:
+- `compareNeeds` of the needs before and after this acceptance over the 300-min projection;
+- the routable count at each scope hospital at the start;
+- the filled need ids.
+
+It then emits `offer_superseded` for same-slot offers and `offer_cancelled` (cause `gap_filled`, with reason and `filledBy`) for other open offers whose needs are all filled. Both come from `system:act-engine`.
+
+**D-59 Offer state machine.** `src/act/offers.ts` folds the log into offer records. The status is derived (`proposed → approved → sent → delivered → accepted | declined | expired | cancelled | superseded`; `proposed → rejected`), with expiry derived per OQ-36. `listOffers` returns status, timers (`msUntilExpiry`, `expiresAtMs`) and the allowed next actions per role for the UI. `offerLogEntries` and `acceptedOffersOf` adapt the log for decide.
+
+**D-60 Audit.** `auditTrail(log, offerId)` and `auditCsv(log)` read only the log: who was considered, who was excluded and why, who proposed, who approved or rejected and why, when sent, the channel and message, the outcome with time and actor, the coverage effect, and the cancellations caused. They are identical after the dataset gains events (`test/audit.test.ts`). The 27 CSV columns are pinned, with one line per offer; message newlines become " / " in the CSV only.
+
+**D-61 Demo.** `pnpm demo:loop` narrates the happy path at sim times (18:20 detect → 18:21 propose → 18:22 approve and deliver → 18:24 accept → coverage update → refusal of a second offer for the filled need → audit), then the decline branch (no next candidate, escalation raised and authorized) and the no-response branch (expired at 18:32:00, tick, a late accept refused). It writes `docs/ACT_LOOP.md`.
+

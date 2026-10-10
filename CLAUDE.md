@@ -5,14 +5,14 @@ Entry for Sevaro Challenge 2 (Tele-Neurology Operations Command Center), Rutgers
 Lookahead rebuilds operational state from Sevaro's raw event stream, detects what needs attention now and in the next 60–90 minutes, recommends interventions (reassign, escalate, split-shift offer) with full rule-by-rule explanations, and runs a human-approved closed loop (coordinator proposes → clinical lead approves → off-shift physician accepts on phone). A seeded Monte Carlo "routing twin" models the routing rules to show an intervention's effect, including the split-shift trap. LLMs are NEVER in the decision path; they may only narrate engine-computed facts.
 
 Layout:
-- `packages/engine/`: pure TypeScript library: `src/data` (loaders), `src/replay` (event-time state), `src/detect` (routing, standards, demand, coverage, attention), `src/decide` (needs, eligibility ledger, trap, what-if, interventions, offer text + PHI guard; `decide()`). Tests in `packages/engine/test/`, expected answers in `packages/engine/test/golden/`.
+- `packages/engine/`: pure TypeScript library: `src/data` (loaders), `src/replay` (event-time state), `src/detect` (routing, standards, demand, coverage, attention), `src/decide` (needs, eligibility ledger, trap, what-if, interventions, offer text + PHI guard; `decide()`), `src/act` (append-only action log, `applyCommand`, offer state machine, audit). Tests in `packages/engine/test/`, expected answers in `packages/engine/test/golden/`.
 - `packages/engine/src/policy.ts`: named defaults for every open question.
 - `apps/web/`: UI (later session).
-- `scripts/recon.ts`: `pnpm recon` writes `docs/DATA_PROFILE.md`. `scripts/detect-report.ts`: `pnpm report:detect` writes `docs/DETECT_1820.md`. `scripts/decide-report.ts`: `pnpm report:decide` writes `docs/DECIDE_1820.md`.
+- `scripts/recon.ts`: `pnpm recon` writes `docs/DATA_PROFILE.md`. `scripts/detect-report.ts`: `pnpm report:detect` writes `docs/DETECT_1820.md`. `scripts/decide-report.ts`: `pnpm report:decide` writes `docs/DECIDE_1820.md`. `scripts/demo-loop.ts`: `pnpm demo:loop` writes `docs/ACT_LOOP.md`.
 - `data/raw/`: the Sevaro data package, unmodified.
 - `docs/`: `brief_c2.pdf`/`brief_c2.md` (the brief), `DATA_PROFILE.md`, `OPEN_QUESTIONS.md`, `DECISIONS.md`.
 
-Commands: `pnpm install`, `pnpm typecheck`, `pnpm test`, `pnpm recon`, `pnpm report:detect`, `pnpm report:decide`, `pnpm lint`.
+Commands: `pnpm install`, `pnpm typecheck`, `pnpm test`, `pnpm recon`, `pnpm report:detect`, `pnpm report:decide`, `pnpm demo:loop`, `pnpm lint`.
 
 ## Rules
 

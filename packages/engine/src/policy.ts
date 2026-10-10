@@ -248,3 +248,62 @@ export const TRAP_SEED_STATISTIC = 'median_floor' as const;
 
 /** Design choice (DECISIONS D-50): interventions are generated for this many top attention items, plus every need. */
 export const INTERVENTION_TOP_ITEMS = 10;
+
+// ---------------------------------------------------------------- Act layer (Session 5)
+
+/**
+ * OQ-36: "Offers expire if not answered within 10 minutes." Boundary: an offer
+ * delivered at T is expired at T + 10:00 exactly (now >= T + 10 min); a reply
+ * at T + 9:59.999 is still in time.
+ */
+export const OFFER_EXPIRY_BOUNDARY: 'inclusive' | 'exclusive' = 'inclusive';
+
+/**
+ * OQ-37: "Handle the case where two physicians accept the same offer." Default
+ * 'sequential': one physician at a time per need (ledger rank order), so a
+ * double accept cannot occur. 'parallel': one slot offered to the top
+ * PARALLEL_OFFER_K eligible physicians at once; the first accept in log order
+ * wins and the others are superseded.
+ */
+export const OFFER_DISPATCH_MODE: 'sequential' | 'parallel' = 'sequential';
+export const PARALLEL_OFFER_K = 2;
+
+/**
+ * OQ-38: an escalation is a record, not a state change in Synapse: the
+ * coordinator raises it, the clinical lead authorizes it. Authorization is
+ * required before it counts as authorized; there is no automatic escalation.
+ */
+export const ESCALATION_REQUIRES_AUTHORIZATION = true;
+
+/**
+ * OQ-39: an accepted offer counts as staffed from max(offered start,
+ * accepted at + est_minutes_to_online) until the offered end: the physician
+ * cannot come online before they accept.
+ */
+export const ACCEPTED_OFFER_START: 'max_offered_start_or_accept_plus_online' | 'offered_start' = 'max_offered_start_or_accept_plus_online';
+
+/**
+ * OQ-40: brief "stop sending offers once the gap is filled". A need is filled
+ * when an accepted offer covering its hospital has started within it and no
+ * DEADLOCK_NOW/HARD_GAP remains at that hospital from that start to the need's
+ * end (time to come online before the start cannot be filled by anyone).
+ */
+export const NEED_FILLED_RULE = 'no_qualifying_need_after_relief_start' as const;
+
+/**
+ * OQ-41 (refines OQ-09): offers counted toward "3 offers per physician per
+ * week": every offer sent this ISO week, plus offers proposed or approved and
+ * not yet sent. Offers rejected by the clinical lead or cancelled before
+ * sending never reached the physician and do not count.
+ */
+export const WEEKLY_CAP_COUNTS = 'sent_or_pending' as const;
+
+/** OQ-42: who may cancel an offer before it is answered. The brief is silent; both humans in the approval chain. Accepted offers are not cancellable here. */
+export const OFFER_CANCEL_ROLES: readonly ('coordinator' | 'clinical_lead')[] = ['coordinator', 'clinical_lead'];
+
+/**
+ * OQ-43: after a decline, an expiry or a clinical-lead rejection, the next
+ * recommended candidate skips that physician for overlapping needs. Advisory:
+ * the coordinator may still propose them explicitly.
+ */
+export const REOFFER_AFTER_DECLINE = false;

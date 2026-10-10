@@ -12,7 +12,8 @@
     "recon": "tsx scripts/recon.ts",
     "lint": "eslint .",
     "report:detect": "tsx scripts/detect-report.ts",
-    "report:decide": "tsx scripts/decide-report.ts"
+    "report:decide": "tsx scripts/decide-report.ts",
+    "demo:loop": "tsx scripts/demo-loop.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

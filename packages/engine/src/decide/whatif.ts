@@ -1,21 +1,13 @@
 import { detect, type DetectionReport } from '../detect';
 import { projectCoverage, type CoverageProjection } from '../detect/coverage';
 import { candidatePhysicians, routableNow } from '../detect/routing';
-import { confirmationEvent, etClock, isDayShift, withShifts, type ScheduledShift } from '../detect/staffing';
+import { etClock, offerShift, withShifts, type AcceptedOffer } from '../detect/staffing';
 import { DECISION_HORIZON_MIN, PROJECTION_STEP_MIN } from '../policy';
 import type { Dataset, EpochMs } from '../types';
 import { computeNeeds, needEndMs } from './needs';
 import type { Need } from './types';
 
-/** An accepted split-shift offer, as the what-if treats it. */
-export interface AcceptedOffer {
-  readonly physicianId: string;
-  readonly name: string | null;
-  readonly startMs: EpochMs;
-  readonly endMs: EpochMs;
-  readonly scopeHospitalIds: readonly string[];
-  readonly seededConsultCount: number;
-}
+export type { AcceptedOffer };
 
 export interface RoutableAt {
   readonly physicianId: string;
@@ -50,21 +42,7 @@ export function projectWithOffers(dataset: Dataset, nowMs: EpochMs, offers: read
 
 /** As projectWithOffers, reusing a detection already computed at the same instant. */
 export function projectWithOffersFrom(dataset: Dataset, detection: DetectionReport, offers: readonly AcceptedOffer[], decisionHorizonMin = DECISION_HORIZON_MIN): WhatIf {
-  const shifts: ScheduledShift[] = offers.map((o) => {
-    const confirmedBy = confirmationEvent(detection.state, o.physicianId, o.startMs);
-    return {
-      physicianId: o.physicianId,
-      name: o.name,
-      startMs: o.startMs,
-      endMs: o.endMs,
-      source: 'split_shift_offer',
-      dayShift: isDayShift(o.startMs),
-      confirmation: confirmedBy === null ? 'expected' : 'confirmed',
-      confirmedBy,
-      scopeHospitalIds: o.scopeHospitalIds,
-      seededConsults: o.seededConsultCount,
-    };
-  });
+  const shifts = offers.map((o) => offerShift(detection.state, o));
   const staffing = withShifts(detection.staffing, shifts);
   const coverage = projectCoverage(dataset, detection.state, staffing, detection.demand, detection.nowMs, { horizonMin: decisionHorizonMin, stepMin: PROJECTION_STEP_MIN }, detection.routability);
   const routableAtOfferStart = offers.flatMap((o) =>

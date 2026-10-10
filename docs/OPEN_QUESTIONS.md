@@ -41,6 +41,14 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 | OQ-33 | Offer window length and "value of the offer" | Open |
 | OQ-34 | Ranking several eligible physicians | Open |
 | OQ-35 | Split-shift trap mitigation | Open |
+| OQ-36 | Offer expiry boundary | Open |
+| OQ-37 | Sequential vs parallel offers; K | Open |
+| OQ-38 | What an escalation is | Open |
+| OQ-39 | When an accepted offer starts counting | Open |
+| OQ-40 | When a need is "filled" | Open |
+| OQ-41 | Which offers count toward the weekly cap | Open |
+| OQ-42 | Who may cancel an offer | Open |
+| OQ-43 | Re-offering after a decline, expiry or rejection | Open |
 
 ---
 
@@ -314,4 +322,58 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
   - With SCOPE, SYN-004 (Meadowlands, AT_RISK only) is excluded.
   - With SEED 14 (median of 10, 12, 14, 14, 15, 15), PHY-009 is first pick only at SYN-005, where it ties PHY-003 at 14 and has never answered.
 - **Verify:** not in the data; it is a design choice the brief explicitly allows.
+
+### OQ-36 Offer expiry boundary
+- **Brief:** "Offers expire if not answered within 10 minutes."
+- **Default:** an offer delivered at T is expired at exactly T + 10:00 (`now >= T + 10 min`); a reply at T + 9:59.999 is in time. `OFFER_EXPIRY_BOUNDARY = 'inclusive'`. Expiry is derived from the log (no timer). `tick` writes `offer_expired` with `expiredAtMs = T + 10 min` so the audit log shows it, and is idempotent.
+- **Verify:** `test/expiry.test.ts`. In the demo, delivered 18:22:00 → expired 18:32:00.
+
+### OQ-37 Sequential vs parallel offers; K
+- **Brief:** "Handle the case where two physicians accept the same offer." Silent on whether several physicians may hold offers for one gap at once.
+- **Default:** `OFFER_DISPATCH_MODE = 'sequential'`.
+  - **Sequential:** one in-flight offer per need. A second proposal for an overlapping need is INVALID_STATE. After a decline, expiry or rejection, `recommendNext` names the next eligible physician.
+  - **Parallel:** `proposeSlot` offers one slot to the top `PARALLEL_OFFER_K = 2` eligible physicians. The first accept in log order wins; every other open offer in the slot is `offer_superseded` ("slot filled by another physician"), and a later accept gets NO_LONGER_AVAILABLE.
+  - Concurrent writers use `expectedSeq`: of two accepts against the same log version, one succeeds and the other gets CONFLICT.
+- **Why sequential by default:** with exactly one eligible physician at 18:20 the modes behave the same, and sequential never sends an offer that might have to be taken back.
+- **Verify:** `test/race.test.ts`, on a test-only roster where PHY-014 has 40 h so two physicians are eligible.
+
+### OQ-38 What an escalation is
+- **Brief:** "Escalate to clinical leadership"; the clinical lead can "authorize escalations". The brief never says what an authorized escalation does.
+- **Default:** a record, not a change in Synapse. The coordinator raises it (`escalation_raised`, with a subject: need, attention item, consults, hospitals); the clinical lead authorizes it (`escalation_authorized`). Authorization is required (`ESCALATION_REQUIRES_AUTHORIZATION = true`) and happens once. What the lead then does (for example a physician-to-physician handoff outside routing) happens outside the system. Reassignments are likewise recorded as "requested in Synapse" and never mutate Sevaro state.
+- **Verify:** `test/roles.test.ts`.
+
+### OQ-39 When an accepted offer starts counting
+- **Brief:** "update projected coverage when someone accepts"; "The estimated time to come online counts against the value of the offer."
+- **Question:** the window is fixed at proposal (start = proposal time + time to online). The physician accepts later and cannot come online before accepting.
+- **Default:** an accepted offer counts as staffed from max(offered start, accepted at + `est_minutes_to_online`) until the offered end. `ACCEPTED_OFFER_START = 'max_offered_start_or_accept_plus_online'`. It stays "expected" until a `shift_started` (OQ-29).
+- **Effect at 18:20:** proposed 18:21 (window 18:36–22:36), accepted 18:24, so it counts from 18:39. The Session 4 what-if's 18:35 is reproduced exactly only when the whole loop happens at 18:20 (`test/loop.happy.test.ts`).
+- **Alternative:** `'offered_start'` would count from 18:36.
+
+### OQ-40 When a need is "filled"
+- **Brief:** "stop sending offers once the gap is filled."
+- **Default (`NEED_FILLED_RULE`):** a need is filled when two things hold:
+  - an accepted offer whose scope includes the need's hospital has started inside the need;
+  - no DEADLOCK_NOW or HARD_GAP (OQ-30) remains at that hospital from that start to the need's end.
+
+  The time before the physician comes online cannot be filled by any offer, so it does not keep the need open.
+- **What it drives:**
+  - On accept, every other open offer whose frozen needs are all filled is `offer_cancelled` with cause `gap_filled`.
+  - `proposeOffer` for a filled need is NEED_ALREADY_FILLED. With no `needIds`, the refusal applies only when all of the physician's needs are filled.
+- **Effect at 18:24:** the SYN-005 and SYN-010 deadlocks and HARD_GAP SYN-008 are filled. HARD_GAP SYN-005 is not: it reopens at 22:36 when the offer ends.
+- **Verify:** `test/cancel-on-fill.test.ts`.
+
+### OQ-41 Which offers count toward the weekly cap
+- **Brief:** "no more than 3 offers per physician per week" (week per OQ-09).
+- **Default:** count every offer sent this ISO week, plus offers proposed or approved and not yet sent. Offers rejected by the clinical lead, or cancelled or superseded before sending, never reached the physician and do not count. `WEEKLY_CAP_COUNTS = 'sent_or_pending'`. The roster's `offers_declined_last_30d` stays a ranking signal only (OQ-34); declines in this session do not change it.
+- **Verify:** `test/caps.test.ts`.
+
+### OQ-42 Who may cancel an offer
+- **Brief:** silent.
+- **Default:** the coordinator or the clinical lead (`OFFER_CANCEL_ROLES`) may cancel an offer that is proposed, approved, sent or delivered and not yet answered. Cancelling an accepted shift is out of scope (INVALID_STATE).
+- **Verify:** design choice.
+
+### OQ-43 Re-offering after a decline, expiry or rejection
+- **Brief:** silent.
+- **Default:** `REOFFER_AFTER_DECLINE = false`. `recommendNext` skips a physician who declined, let expire, or was rejected for an overlapping need. Advisory only: the coordinator may still propose them explicitly.
+- **Effect at 18:24:** after PHY-009 declines, there is no next candidate, so the escalation stays with the clinical lead.
 

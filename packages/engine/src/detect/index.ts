@@ -7,13 +7,15 @@ import { MIN_PROJECTION_HORIZON_MIN } from './brief-rules';
 import { projectCoverage, type CoverageProjection } from './coverage';
 import { evaluateDemand, type DemandEvaluation } from './demand';
 import { candidatePhysicians, chooseRoute, findRoutingDeadlocks, routableNow, type DeadlockFinding, type Routability, type RouteChoice } from './routing';
-import { buildStaffingModel, type StaffingModel } from './staffing';
+import { buildStaffingModel, offerShift, withShifts, type AcceptedOffer, type StaffingModel } from './staffing';
 import { evaluateOpenNotes, evaluateStandards, type OpenNotesEvaluation, type StandardEvaluation } from './standards';
 
 export interface DetectOptions {
   /** Projection horizon in minutes (default policy.PROJECTION_HORIZON_MIN; must be >= 90). */
   readonly horizonMin?: number;
   readonly stepMin?: number;
+  /** Accepted split-shift offers (Act layer): count as scoped, seeded shifts from their start. */
+  readonly acceptedOffers?: readonly AcceptedOffer[];
 }
 
 export interface DetectionReport {
@@ -42,7 +44,7 @@ export function detect(dataset: Dataset, nowMs: EpochMs, opts: DetectOptions = {
   if (stepMin <= 0) throw new RangeError('projection step must be positive');
 
   const state = replay(dataset, nowMs);
-  const staffing = buildStaffingModel(dataset, state);
+  const staffing = withShifts(buildStaffingModel(dataset, state), (opts.acceptedOffers ?? []).map((o) => offerShift(state, o)));
   const physicians = candidatePhysicians(state, staffing, nowMs);
   const routability: Record<string, Record<string, Routability>> = {};
   const routes: Record<string, RouteChoice> = {};
@@ -91,5 +93,5 @@ export {
   type RouteOptions,
   type DeadlockFinding,
 } from './routing';
-export { buildStaffingModel, confirmationEvent, isDayShift, shiftCountsAt, shiftsAt, withShifts, etClock, etClockS, type StaffingModel, type ScheduledShift } from './staffing';
+export { buildStaffingModel, confirmationEvent, isDayShift, offerShift, shiftCountsAt, shiftsAt, withShifts, etClock, etClockS, type AcceptedOffer, type StaffingModel, type ScheduledShift } from './staffing';
 export { evaluateStandards, evaluateOpenNotes, type StandardEvaluation, type OpenNotesEvaluation, type Level } from './standards';

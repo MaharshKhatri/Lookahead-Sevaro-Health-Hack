@@ -11,3 +11,4 @@ export type { PendingEvent } from './data/events';
 export * from './replay';
 export * from './detect';
 export * from './decide';
+export * from './act';

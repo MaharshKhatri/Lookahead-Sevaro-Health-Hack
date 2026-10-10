@@ -28,6 +28,20 @@ export interface ScheduledShift {
   readonly seededConsults: number;
 }
 
+/**
+ * An accepted split-shift offer as staffing sees it (brief "Act": "update
+ * projected coverage when someone accepts"). Scope and seed are the OQ-35
+ * trap mitigations frozen into the offer.
+ */
+export interface AcceptedOffer {
+  readonly physicianId: string;
+  readonly name: string | null;
+  readonly startMs: EpochMs;
+  readonly endMs: EpochMs;
+  readonly scopeHospitalIds: readonly string[];
+  readonly seededConsultCount: number;
+}
+
 /** Static facts detection needs beside the replay state. Built once per detect() call. */
 export interface StaffingModel {
   readonly credentials: ReadonlyMap<string, ReadonlySet<string>>;
@@ -141,3 +155,20 @@ function formatEt(ms: EpochMs, fmt: 'HH:mm' | 'HH:mm:ss'): string {
 export const etClock = (ms: EpochMs): string => formatEt(ms, 'HH:mm');
 export const etClockS = (ms: EpochMs): string => formatEt(ms, 'HH:mm:ss');
 export const minutes = (ms: number): string => (ms / 60_000).toFixed(1).replace(/\.0$/, '');
+
+/** The shift an accepted offer adds: expected until a shift_started at/after its start is known (OQ-29). */
+export function offerShift(state: NetworkState, o: AcceptedOffer): ScheduledShift {
+  const confirmedBy = confirmationEvent(state, o.physicianId, o.startMs);
+  return {
+    physicianId: o.physicianId,
+    name: o.name,
+    startMs: o.startMs,
+    endMs: o.endMs,
+    source: 'split_shift_offer',
+    dayShift: isDayShift(o.startMs),
+    confirmation: confirmedBy === null ? 'expected' : 'confirmed',
+    confirmedBy,
+    scopeHospitalIds: o.scopeHospitalIds,
+    seededConsults: o.seededConsultCount,
+  };
+}

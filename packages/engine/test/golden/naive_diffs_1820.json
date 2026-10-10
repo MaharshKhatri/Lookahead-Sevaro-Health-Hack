@@ -1,0 +1,282 @@
+[
+  {
+    "table": "consults",
+    "key": "CON-2101",
+    "column": "stage_entered_at",
+    "expected": "18:06:00",
+    "actual": "18:06:02"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2101",
+    "column": "minutes_in_stage",
+    "expected": "14",
+    "actual": "13"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2101",
+    "column": "minutes_since_received",
+    "expected": "39",
+    "actual": "38"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2102",
+    "column": "stage_entered_at",
+    "expected": "17:54:00",
+    "actual": "17:54:04"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2102",
+    "column": "minutes_in_stage",
+    "expected": "26",
+    "actual": "25"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2102",
+    "column": "minutes_since_received",
+    "expected": "36",
+    "actual": "35"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2103",
+    "column": "stage_entered_at",
+    "expected": "17:46:00",
+    "actual": "17:46:02"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2103",
+    "column": "minutes_in_stage",
+    "expected": "34",
+    "actual": "33"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2103",
+    "column": "minutes_since_received",
+    "expected": "75",
+    "actual": "74"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2104",
+    "column": "stage_entered_at",
+    "expected": "18:14:00",
+    "actual": "18:14:03"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2104",
+    "column": "minutes_in_stage",
+    "expected": "6",
+    "actual": "5"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2104",
+    "column": "minutes_since_received",
+    "expected": "9",
+    "actual": "8"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2105",
+    "column": "stage_entered_at",
+    "expected": "18:09:05",
+    "actual": "18:09:07"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2106",
+    "column": "stage_entered_at",
+    "expected": "18:02:00",
+    "actual": "18:02:03"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2106",
+    "column": "minutes_in_stage",
+    "expected": "18",
+    "actual": "17"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2106",
+    "column": "minutes_since_received",
+    "expected": "60",
+    "actual": "59"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2107",
+    "column": "stage_entered_at",
+    "expected": "18:11:20",
+    "actual": "18:18:05"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2107",
+    "column": "minutes_in_stage",
+    "expected": "8",
+    "actual": "1"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2108",
+    "column": "stage_entered_at",
+    "expected": "18:04:00",
+    "actual": "18:04:03"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2108",
+    "column": "minutes_in_stage",
+    "expected": "16",
+    "actual": "15"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2108",
+    "column": "minutes_since_received",
+    "expected": "33",
+    "actual": "32"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2109",
+    "column": "stage_entered_at",
+    "expected": "18:16:00",
+    "actual": "18:16:03"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2109",
+    "column": "minutes_in_stage",
+    "expected": "4",
+    "actual": "3"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2109",
+    "column": "minutes_since_received",
+    "expected": "4",
+    "actual": "3"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2110",
+    "column": "stage_entered_at",
+    "expected": "18:07:15",
+    "actual": "18:07:19"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2111",
+    "column": "stage_entered_at",
+    "expected": "18:00:10",
+    "actual": "18:00:14"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2112",
+    "column": "stage_entered_at",
+    "expected": "18:04:50",
+    "actual": "18:04:53"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2113",
+    "column": "stage_entered_at",
+    "expected": "18:11:50",
+    "actual": "18:11:53"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2113",
+    "column": "minutes_since_received",
+    "expected": "25",
+    "actual": "24"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2114",
+    "column": "stage_entered_at",
+    "expected": "18:17:10",
+    "actual": "18:17:14"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2115",
+    "column": "stage_entered_at",
+    "expected": "17:30:00",
+    "actual": "17:30:04"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2115",
+    "column": "minutes_in_stage",
+    "expected": "50",
+    "actual": "49"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2115",
+    "column": "minutes_since_received",
+    "expected": "90",
+    "actual": "89"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2116",
+    "column": "stage_entered_at",
+    "expected": "17:58:00",
+    "actual": "17:58:04"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2116",
+    "column": "minutes_in_stage",
+    "expected": "22",
+    "actual": "21"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2116",
+    "column": "minutes_since_received",
+    "expected": "70",
+    "actual": "69"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2117",
+    "column": "stage_entered_at",
+    "expected": "17:40:30",
+    "actual": "17:40:32"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2118",
+    "column": "stage_entered_at",
+    "expected": "17:35:00",
+    "actual": "17:35:03"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2118",
+    "column": "minutes_in_stage",
+    "expected": "45",
+    "actual": "44"
+  },
+  {
+    "table": "consults",
+    "key": "CON-2118",
+    "column": "minutes_since_received",
+    "expected": "78",
+    "actual": "77"
+  }
+]

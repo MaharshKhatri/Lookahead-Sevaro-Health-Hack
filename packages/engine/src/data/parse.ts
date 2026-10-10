@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Dataset, DatasetFileNames, RowSource, Snapshot } from '../types';
 import { readCsvText, type CsvTable } from './csv';
 import { DataParseError } from './errors';
+import { mapEventRow } from './events';
 import { integrityWarnings } from './integrity';
 import {
   baselineHourlySchema,
@@ -62,17 +63,8 @@ export function parseDataset(texts: DatasetTexts): Dataset {
   };
 
   const events = parseRows(table(files.events), eventStreamSchema, warnings, (r, src, raw) => ({
-    ...src,
-    eventId: r.event_id,
-    eventTime: r.event_time,
-    eventTimeRaw: (raw.event_time ?? '').trim(),
+    ...mapEventRow(r, src, raw),
     ingestedAt: r.ingested_at,
-    ingestedAtRaw: (raw.ingested_at ?? '').trim(),
-    consultId: r.consult_id,
-    eventType: r.event_type,
-    physicianId: r.physician_id,
-    hospitalId: r.hospital_id,
-    description: r.description,
   }));
 
   const hospitals = parseRows(table(files.hospitals), hospitalsSchema, warnings, (r, src) => ({

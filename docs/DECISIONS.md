@@ -50,3 +50,57 @@ Append-only log. Each entry: what was decided, why, and where it lives. Policy d
 - 3 happened 4–22 s before the assignee's video ended.
 
 So the routing twin must model the brief's rules ("model its effect, do not replace it") and must not be fitted to reproduce every historical assignment. The 4 `routing_attempt_failed` events are the validation targets (all explained under OQ-23).
+
+## Session 2: replay engine and snapshot verification (2026-10-10)
+
+**D-19 Reducer design.** `replay(dataset, asOfMs, {mode})` (`src/replay/reduce.ts`) is pure.
+- It builds private mutable drafts, folds the planned events through one dispatcher (an exhaustive `switch` over the 20 brief event types, with a `never` check, each case calling a small handler), then freezes the result into `NetworkState` (`src/replay/derive.ts`).
+- Physician and consult state are separate models (brief "Important Data Model Concepts").
+- Stage transitions are the recon mapping that reproduced 18/18 (OQ-18), now with OQ-25 for repeated and backward stages.
+- Bad sequences never throw. Examples: video_ended without video_started, a call end with no call, events after sign-off, unknown consults, missing IDs, an unrecognised status. Each produces an integrity warning that names the event id. Events that cannot be applied at all are counted in `ignoredCount`.
+- Physicians outside physicians_on_shift.csv are tracked (`onRoster: false`) with a warning.
+
+**D-20 Knowledge-time semantics.** The correct-mode view at T is:
+- dedupe (OQ-04);
+- keep events with `ingested_at <= T` (`knownAt`);
+- keep events with `event_time <= T` (a known future-dated event is deferred with a warning);
+- order by `(event_time, ingested_at, event_id, payload)`;
+- apply each event at its `event_time`.
+
+The sort key never uses file position, so the result doesn't depend on input order; 20 seeded shuffles give identical state. The simulated clock and late events therefore behave the way the system would actually have seen them. At 18:15 the late video start is unknown and PHY-006 is flagged; at 18:18:05 it lands, backdated to 18:11:20.
+
+**D-21 Naive mode.** `{mode: 'naive'}` is for the Integrity panel only. It uses arrival (array) order, no dedupe, and applies each event at its `ingested_at`. It reuses the same dispatcher and handlers; only the plan (which events, what order, which time accessor) differs, so there is no second implementation. At 18:20 it produces 40 consult-cell diffs and 0 physician diffs (recorded in `test/golden/naive_diffs_1820.json`).
+
+**D-22 Provenance.** Explainable values are `Provenanced<T> = {value, because: EventRef[], rule: RuleCode}`. This covers `selfStatus`, `derivedState` and every flag; `agent` and `camera` carry `because` directly. `RuleCode` is the key set of `RULES` in `src/replay/rules.ts`, and each entry cites its brief section or OQ. Derived-state precedence is driven by `policy.DERIVED_STATE_PRECEDENCE` (OQ-15). Label strings are the snapshot's `derived_state` vocabulary, plus "In Meeting" from the brief's status list.
+
+**D-23 Flags.**
+- **EXTERNAL_VIDEO_SUSPECTED:** camera active, agent online, no Synapse video, status not In Meeting. This is the brief's rule as written; a concurrent phone call does not suppress it.
+- **AGENT_OFFLINE_UNVERIFIED:** whenever the agent is offline.
+- **TEMP_UNAVAILABLE_WITH_ASSIGNED:** lists every open consult still assigned, not only stroke consults. The UI can filter by consult type.
+- **RINGING_UNANSWERED:** carries the seconds since ringing began; there is no timeout (OQ-17).
+- **IN_MEETING_INTERRUPTIBLE:** whenever the status is In Meeting, with `cameraActive` noted.
+
+Each flag carries `sinceMs`, which the late-event impact uses for correction windows.
+
+**D-24 Snapshot projection and diff.** `toSnapshotPhysicianRows` and `toSnapshotConsultRows` output objects keyed by the exact snapshot column names, which come from the Session 1 zod schemas. Cells are formatted as in the files: ET `HH:mm` / `HH:mm:ss`, floored minutes, `"Unassigned"`, `"Online"` / `"Offline"`. `diffSnapshot` compares those cells with `referenceSnapshotRows(dataset.snapshot)`, so reference values always come from the loaded files. Missing or unexpected rows show as column `*`. `snapshotAsOfMs(dataset)` derives "now" from the snapshot label (OQ-13).
+
+**D-25 Late-event impact.** `lateEventImpact(dataset, asOfMs)` takes each late event (OQ-12) known by `asOfMs`. It replays at that event's `ingested_at` twice, once with the event and once without, and compares the facts of every consult and physician. Comparing at the same instant, rather than at `ingestedAt − 1 ms`, isolates the event from anything else ingested at that moment. The correction window runs from the event's `event_time` (or a retracted flag's `sinceMs`, if later) to its `ingested_at`.
+
+**D-26 Live append.**
+- `parseEventRows` accepts event_stream.csv text with or without a header. A header is detected when any first-line cell, after the optional column `mapping`, is an event_stream column name. Header-less lines must have the file's 8 cells. It reuses the Session 1 csv reader (new header-less and relaxed-column modes) and the shared `mapEventRow`. `pendingEventSchema` allows a blank `ingested_at`. Bad lines become per-line errors.
+- `appendEvents` never mutates its input:
+  - duplicates (OQ-04) are skipped and reported;
+  - a reused id with different content is accepted with a warning;
+  - unknown hospital or physician ids are accepted with a warning;
+  - an event missing a column its type needs is rejected (consult_id everywhere except physician-signal events, physician_id everywhere except received/triaged/routing failures, hospital_id on consult_received; pattern taken from DATA_PROFILE);
+  - a blank `ingested_at` is stamped with `nowMs` and reported.
+- `appendEventText` combines the two steps for the UI.
+
+**D-27 Shift counters.** `consultsThisShift` and `callsThisShift` reset at `shift_started` (OQ-11, `SHIFT_COUNTERS_RESET_ON_SHIFT_STARTED`). This keeps multi-day replays honest (see the 10× bench) and doesn't change any count in the reference day.
+
+**D-28 Performance.** Median replay is about 4–6 ms for the 1,164-event stream and about 19–21 ms for a 10× synthetic stream (10 day-shifted copies with remapped ids), against limits of 50 ms and 400 ms. `LOOKAHEAD_SKIP_BENCH=1` prints the timings but skips the thresholds on noisy CI.
+
+**D-29 Data-layer additions.**
+- `readCsvText` gained `columns` (header-less) and `relaxColumnCount` options, plus `CsvRow.cellCount`.
+- `src/data/events.ts` holds the one event-row mapper, which the loader and live append both use.
+- `fields.optionalInstant` was added.

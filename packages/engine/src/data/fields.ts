@@ -86,6 +86,7 @@ export const optionalText = z
   .trim()
   .transform((s) => (s === '' ? null : s));
 export const instant = field(parseInstant);
+export const optionalInstant = field((s) => (s === '' ? null : parseInstant(s)));
 export const clockTime = field(parseClockTime);
 export const timeBlock = field(parseTimeBlock);
 export const integer = field(parseInteger);

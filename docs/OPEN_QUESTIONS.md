@@ -29,6 +29,8 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 | OQ-21 | Offer/shift overlap boundary; shift-end source | Open |
 | OQ-22 | "Open notes within 60 min of shift end" | Open |
 | OQ-23 | Assigned-but-not-contacted physician in routing | Supported |
+| OQ-24 | Two notions of "available": staffed capacity vs routable now | Open (documented, not implemented) |
+| OQ-25 | Repeated or backward stage events | Open |
 
 ---
 
@@ -98,8 +100,8 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 
 ### OQ-11 Snapshot "consults" and "calls" counts
 - **Data:** `consults_this_shift` = count of `physician_assigned`. `calls_this_shift` = count of `incoming_call_started` + `outgoing_call_started`, with `incoming_call_ringing` excluded. Including ringing would give PHY-007 7 instead of 6.
-- **Default:** as derived. `CONSULT_COUNT_EVENT_TYPES`, `CALL_COUNT_EVENT_TYPES`.
-- **Verify:** reproduces 8/8 rows of snapshot_physicians_1820.csv (DATA_PROFILE).
+- **Default:** as derived. "This shift" counters restart at the physician's `shift_started` event. In the reference data every physician has exactly one, at shift start, so the reset doesn't change any count. `CONSULT_COUNT_EVENT_TYPES`, `CALL_COUNT_EVENT_TYPES`, `SHIFT_COUNTERS_RESET_ON_SHIFT_STARTED = true`.
+- **Verify:** reproduces 8/8 rows of snapshot_physicians_1820.csv, both in recon and in the engine replay (`test/golden.snapshot.test.ts`).
 
 ### OQ-12 What counts as a "late" event
 - **Brief:** "Events can arrive late. Every event carries both event_time and ingested_at. State built only from arrival order will be wrong."
@@ -131,7 +133,7 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 
 ### OQ-16 When does an offline agent come back?
 - **Brief:** "Agent heartbeat: Online / offline (offline means camera state is unknown)". The only event type is `agent_heartbeat_lost`; there is no "restored" event.
-- **Default:** offline from `agent_heartbeat_lost` until that physician's next `camera_active` or `camera_inactive`, which proves the agent is reporting again. Camera state is "unknown" while offline. `AGENT_BACK_ONLINE_ON_CAMERA_EVENT = true`.
+- **Default:** offline from `agent_heartbeat_lost` until that physician's next `camera_active` or `camera_inactive`, which proves the agent is reporting again. Camera state is "unknown" while offline (`camera.active = null` in PhysicianState). Before any agent event, the agent counts as online: offline is only ever signalled by `agent_heartbeat_lost`. `AGENT_BACK_ONLINE_ON_CAMERA_EVENT = true`.
 - **Verify:** PHY-007 goes offline at 17:38:00 with no later camera event, so "Offline" at 18:20 (8/8 `desktop_agent`). "Offline for the rest of the shift" would also match, so this case doesn't decide between them.
 
 ### OQ-17 incoming_call_ringing semantics
@@ -181,3 +183,25 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
   - 18:14:10 and 18:19:10: PHY-008 Temporarily Unavailable.
   - 18:17:15 at SYN-005: PHY-003 outgoing call, PHY-005 incoming call, PHY-006 video.
   - None of the 100 historical assignments went to a physician with another consult awaiting first contact.
+
+### OQ-24 Two notions of "available": staffed capacity vs routable now
+- **Brief:** "available" appears in two different rules:
+  - Coverage: "a minimum number of available, credentialed physicians per time block".
+  - Routing: "Remove anyone busy (see availability rules), anyone whose phone is already ringing for another call, and anyone who ended a call less than 2 minutes ago".
+- **Problem:** one word, two meanings. If coverage used the routing meaning, the gap count would swing every minute as physicians start and end calls. If routing used the coverage meaning, calls would be sent to physicians already on a call.
+- **Default (later sessions must keep these separate):**
+  - **(a) STAFFED CAPACITY**, used for coverage requirements and projections: on shift + credentialed at the hospital + self-reported status not Temporarily Unavailable. This is OQ-02's default. Physicians busy on a call or video count. Agent-offline physicians count but are flagged as unverified.
+  - **(b) ROUTABLE NOW**, used for the routing twin, "who would get the next call": routing rules 1–2 on top of (a):
+    - not busy: Synapse call or video, or camera without Synapse (EXTERNAL_VIDEO_SUSPECTED);
+    - not with a ringing phone (OQ-17), including an assigned consult awaiting first contact (OQ-23);
+    - not within 2 minutes of a call end (OQ-07: calls only).
+
+    Documenting does not block (OQ-06), and In Meeting is interruptible (brief).
+- **Status:** documented only; routability is not implemented in Session 2. The replay state already holds every input both notions need: `selfStatus`, `activeCalls`, `activeVideo`, `camera`, `agent`, `ringing`, `lastCallEndedMs`, `openConsultIds` / `contactedMs`, `consultsThisShift` and `lastAnsweredMs`.
+- **Verify:** (a) against the OQ-02 check (exactly one projected gap, exactly one eligible off-shift physician). (b) against the 4 `routing_attempt_failed` events (OQ-23).
+
+### OQ-25 Repeated or backward stage events
+- **Brief:** "Not every consult passes through every stage." It says nothing about an event that maps to the consult's current stage again (e.g. a second `imaging_requested`) or to an earlier one.
+- **Data:** neither happens in the reference stream; correct-mode replay produces zero stage warnings. A second imaging request (CT then MRI) or a re-triage is plausible in judges' live data.
+- **Default:** re-entering the current stage keeps the original entry time, so the stage timer keeps running from first entry. A move to an earlier lifecycle stage is applied and raises an integrity warning. Nothing changes after Signed Off (warning). `STAGE_REENTRY_KEEPS_ENTRY_TIME = true`, `STAGE_REGRESSION = 'apply_with_warning'`.
+- **Verify:** not in the snapshot. Covered by `test/reducer.robustness.test.ts`.

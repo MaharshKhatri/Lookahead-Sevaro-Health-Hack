@@ -56,6 +56,8 @@ export const DAY_SHIFT_START_WINDOW_ET = { startSecondOfDay: 6 * 3600, endSecond
 /** OQ-11: snapshot consults_this_shift / calls_this_shift count these event types (ringing is not a call). */
 export const CONSULT_COUNT_EVENT_TYPES: readonly EventType[] = ['physician_assigned'];
 export const CALL_COUNT_EVENT_TYPES: readonly EventType[] = ['incoming_call_started', 'outgoing_call_started'];
+/** OQ-11: "this shift" counters restart at the physician's shift_started event. */
+export const SHIFT_COUNTERS_RESET_ON_SHIFT_STARTED = true;
 
 /** OQ-12: replay always orders by event_time; the UI flags an event as "late" when ingested_at - event_time exceeds this. */
 export const LATE_EVENT_FLAG_LAG_MS = 60_000;
@@ -118,3 +120,11 @@ export const OPEN_NOTES_WINDOW_INCLUSIVE = true;
  * skips them until that first call starts.
  */
 export const PENDING_FIRST_CONTACT_COUNTS_AS_RINGING = true;
+
+/**
+ * OQ-25: an event that maps to the consult's current stage (e.g. a second
+ * imaging_requested) keeps the original stage entry time; an event that maps
+ * to an earlier lifecycle stage is applied and raises an integrity warning.
+ */
+export const STAGE_REENTRY_KEEPS_ENTRY_TIME = true;
+export const STAGE_REGRESSION = 'apply_with_warning' as const;

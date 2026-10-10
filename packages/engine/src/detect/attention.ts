@@ -1,5 +1,6 @@
 import { ATTENTION_SEVERITY_BANDS, ATTENTION_WEIGHTS, IMMINENT_WINDOW_MIN } from '../policy';
 import { compareIds } from '../replay/derive';
+import { fnv1a } from '../util/hash';
 import type { EventRef, NetworkState, PhysicianFlag } from '../replay/types';
 import type { EpochMs } from '../types';
 import type { StandardCode } from './brief-rules';
@@ -346,14 +347,4 @@ function round1(n: number): number {
 
 function clip(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
-}
-
-/** FNV-1a 32-bit, hex: deterministic ids from kind + entities. */
-function fnv1a(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(16).padStart(8, '0');
 }

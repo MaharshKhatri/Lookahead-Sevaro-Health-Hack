@@ -54,6 +54,28 @@ export const RULES = {
   COVERAGE_SHIFT_END: { cites: 'Coverage: gap "at a projected time (for example, when shifts end at 19:00)"; OQ-21' },
   COVERAGE_SCHEDULED_ARRIVAL: { cites: 'Off-shift roster note: "A scheduled night shift is not a split-shift offer"; OQ-27' },
   COVERAGE_BLOCK_CHANGE: { cites: 'coverage_requirements.csv time blocks; OQ-01' },
+  COVERAGE_ARRIVAL_CONFIRMATION: { cites: 'Scheduled arrivals are expected until a shift_started is known; OQ-27, OQ-29' },
+
+  // Needs (Decide layer inputs): brief "Problem to Solve" (Detect -> Decide), OQ-29..OQ-32.
+  NEED_DEADLOCK_NOW: { cites: 'Routing rule 5 now: open consult with no routable physician; OQ-24(b), OQ-32' },
+  NEED_HARD_GAP: { cites: 'Coverage: "A gap exists when that number is not met, either now or at a projected time"; OQ-29' },
+  NEED_AT_RISK: { cites: 'Coverage met only via an unconfirmed scheduled arrival with zero margin; OQ-29 (advisory, OQ-30)' },
+
+  // Split-shift eligibility: brief "Coverage and Split-Shift Eligibility" bullets 1-6.
+  ELIG_OPT_IN: { cites: 'Eligibility: "They have opted in to split-shift offers."' },
+  ELIG_CREDENTIALED_AT_GAP: { cites: 'Eligibility: "They are credentialed at one or more of the hospitals with the gap. Being credentialed elsewhere does not help."; OQ-30' },
+  ELIG_REST_10H: { cites: 'Eligibility: "At least 10 hours have passed since their last shift ended, measured at the offered start time."' },
+  ELIG_HOURS_60: { cites: 'Eligibility: "Hours worked in the trailing 7 days plus the offered hours do not exceed 60."; OQ-20' },
+  ELIG_NO_SCHEDULE_OVERLAP: { cites: 'Eligibility: "The offer does not overlap a shift they are already scheduled for."; OQ-21' },
+  ELIG_MIN_OFFER_2H: { cites: 'Eligibility: "Offers are at least 2 hours long. The estimated time to come online counts against the value of the offer."; OQ-08' },
+  // Notification and Safety Constraints.
+  SAFETY_ONE_OPEN_OFFER: { cites: 'Safety: "No more than one open offer per physician"' },
+  SAFETY_THREE_OFFERS_PER_WEEK: { cites: 'Safety: "no more than 3 offers per physician per week"; OQ-09' },
+
+  // Split-shift trap: brief "How Calls Reach Physicians", "The split-shift trap".
+  TRAP_PRIORITY: { cites: 'Split-shift trap: "A physician who joins mid-shift starts with zero consults. Under rule 4, routing will send them nearly every call"' },
+  TRAP_SCOPE: { cites: 'Split-shift trap mitigation: "limiting the joining physician to the gap hospitals"; OQ-35' },
+  TRAP_SEED: { cites: 'Split-shift trap mitigation: "seeding a starting consult count"; OQ-35' },
 } as const;
 
 export type RuleCode = keyof typeof RULES;

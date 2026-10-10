@@ -1,0 +1,322 @@
+[
+  {
+    "physicianId": "PHY-009",
+    "eligible": true,
+    "rank": 1,
+    "value": 1095,
+    "failed": [],
+    "scope": [
+      "SYN-005",
+      "SYN-008",
+      "SYN-010"
+    ],
+    "window": {
+      "start": "18:35:00",
+      "end": "22:35:00",
+      "minutesToOnline": 15,
+      "offeredMinutes": 255,
+      "effectiveMinutes": 240,
+      "bindingCap": "max_offer_hours"
+    },
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": true,
+        "detail": "split_shift_opt_in = Yes"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": true,
+        "detail": "credentialed at gap hospital(s) SYN-005, SYN-008, SYN-010 (covers DEADLOCK_NOW SYN-005 18:20-19:00; DEADLOCK_NOW SYN-010 18:20-20:00; HARD_GAP SYN-005 20:00-beyond; HARD_GAP SYN-008 20:00-22:00); SYN-004 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-17 07:00 ET; at offered start 18:35 ET: 11.6 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": true,
+        "detail": "36 h + offered 4 h = 40 h <= 60 (headroom 24 h before, 20 h after; OQ-20)"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": true,
+        "detail": "next scheduled shift 03-18 19:00 ET starts 24.4 h after offered start 18:35; a 2-h offer fits (may end exactly at shift start, OQ-21)"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": true,
+        "detail": "offered 18:20-22:35 = 255 min, minus 15 min to come online = 240 min >= 120 (OQ-08)"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  },
+  {
+    "physicianId": "PHY-010",
+    "eligible": false,
+    "rank": null,
+    "value": null,
+    "failed": [
+      "ELIG_CREDENTIALED_AT_GAP"
+    ],
+    "scope": [],
+    "window": null,
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": true,
+        "detail": "split_shift_opt_in = Yes"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": false,
+        "detail": "credentialed at SYN-002, SYN-003, SYN-006, SYN-007; none is a gap hospital (SYN-005, SYN-008, SYN-010); SYN-003 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-16 20:00 ET; at offered start 18:30 ET: 22.5 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": true,
+        "detail": "24 h worked; headroom 36 h >= 2 h"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": true,
+        "detail": "next scheduled shift 03-19 08:00 ET starts 37.5 h after offered start 18:30; a 2-h offer fits (may end exactly at shift start, OQ-21)"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": null,
+        "detail": "not applicable: no gap-hospital need to size an offer against"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  },
+  {
+    "physicianId": "PHY-011",
+    "eligible": false,
+    "rank": null,
+    "value": 120,
+    "failed": [
+      "ELIG_NO_SCHEDULE_OVERLAP"
+    ],
+    "scope": [
+      "SYN-005",
+      "SYN-008"
+    ],
+    "window": {
+      "start": "18:20:00",
+      "end": "19:00:00",
+      "minutesToOnline": 0,
+      "offeredMinutes": 40,
+      "effectiveMinutes": 40,
+      "bindingCap": "next_scheduled_shift"
+    },
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": true,
+        "detail": "split_shift_opt_in = Yes"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": true,
+        "detail": "credentialed at gap hospital(s) SYN-005, SYN-008 (covers DEADLOCK_NOW SYN-005 18:20-19:00; HARD_GAP SYN-005 20:00-beyond; HARD_GAP SYN-008 20:00-22:00); SYN-001, SYN-004, SYN-011 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-17 07:00 ET; at offered start 18:20 ET: 11.3 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": true,
+        "detail": "48 h + offered 0.7 h = 48.7 h <= 60 (headroom 12 h before, 11.3 h after; OQ-20)"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": false,
+        "detail": "next scheduled shift 03-17 19:00 ET starts 40 min after offered start 18:20; any 2-h offer would overlap it"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": true,
+        "detail": "offered 18:20-22:20 = 240 min, minus 0 min to come online = 240 min >= 120 (OQ-08)"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  },
+  {
+    "physicianId": "PHY-012",
+    "eligible": false,
+    "rank": null,
+    "value": 300,
+    "failed": [
+      "ELIG_OPT_IN",
+      "ELIG_NO_SCHEDULE_OVERLAP",
+      "ELIG_MIN_OFFER_2H"
+    ],
+    "scope": [
+      "SYN-010"
+    ],
+    "window": {
+      "start": "18:20:00",
+      "end": "20:00:00",
+      "minutesToOnline": 0,
+      "offeredMinutes": 100,
+      "effectiveMinutes": 100,
+      "bindingCap": "needs_end"
+    },
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": false,
+        "detail": "split_shift_opt_in = No"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": true,
+        "detail": "credentialed at gap hospital(s) SYN-010 (covers DEADLOCK_NOW SYN-010 18:20-20:00); SYN-003 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-16 08:00 ET; at offered start 18:20 ET: 34.3 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": true,
+        "detail": "36 h + offered 1.7 h = 37.7 h <= 60 (headroom 24 h before, 22.3 h after; OQ-20)"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": false,
+        "detail": "next scheduled shift 03-17 20:00 ET starts 100 min after offered start 18:20; any 2-h offer would overlap it"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": false,
+        "detail": "offered 18:20-20:00 = 100 min, minus 0 min to come online = 100 min < 120 (OQ-08)"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  },
+  {
+    "physicianId": "PHY-013",
+    "eligible": false,
+    "rank": null,
+    "value": 840,
+    "failed": [
+      "ELIG_OPT_IN"
+    ],
+    "scope": [
+      "SYN-005",
+      "SYN-010"
+    ],
+    "window": {
+      "start": "18:40:00",
+      "end": "22:40:00",
+      "minutesToOnline": 20,
+      "offeredMinutes": 260,
+      "effectiveMinutes": 240,
+      "bindingCap": "max_offer_hours"
+    },
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": false,
+        "detail": "split_shift_opt_in = No"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": true,
+        "detail": "credentialed at gap hospital(s) SYN-005, SYN-010 (covers DEADLOCK_NOW SYN-005 18:20-19:00; DEADLOCK_NOW SYN-010 18:20-20:00; HARD_GAP SYN-005 20:00-beyond); SYN-011 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-16 20:00 ET; at offered start 18:40 ET: 22.7 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": true,
+        "detail": "48 h + offered 4 h = 52 h <= 60 (headroom 12 h before, 8 h after; OQ-20)"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": true,
+        "detail": "next scheduled shift 03-18 08:00 ET starts 13.3 h after offered start 18:40; a 2-h offer fits (may end exactly at shift start, OQ-21)"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": true,
+        "detail": "offered 18:20-22:40 = 260 min, minus 20 min to come online = 240 min >= 120 (OQ-08)"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  },
+  {
+    "physicianId": "PHY-014",
+    "eligible": false,
+    "rank": null,
+    "value": 240,
+    "failed": [
+      "ELIG_HOURS_60"
+    ],
+    "scope": [
+      "SYN-005",
+      "SYN-010"
+    ],
+    "window": {
+      "start": "19:00:00",
+      "end": "20:00:00",
+      "minutesToOnline": 40,
+      "offeredMinutes": 100,
+      "effectiveMinutes": 60,
+      "bindingCap": "hours_headroom"
+    },
+    "rules": {
+      "ELIG_OPT_IN": {
+        "pass": true,
+        "detail": "split_shift_opt_in = Yes"
+      },
+      "ELIG_CREDENTIALED_AT_GAP": {
+        "pass": true,
+        "detail": "credentialed at gap hospital(s) SYN-005, SYN-010 (covers DEADLOCK_NOW SYN-005 18:20-19:00; DEADLOCK_NOW SYN-010 18:20-20:00; HARD_GAP SYN-005 20:00-beyond); SYN-001 AT_RISK only (advisory, OQ-30)"
+      },
+      "ELIG_REST_10H": {
+        "pass": true,
+        "detail": "last shift ended 03-16 20:00 ET; at offered start 19:00 ET: 23 h >= 10 h"
+      },
+      "ELIG_HOURS_60": {
+        "pass": false,
+        "detail": "59 h + minimum 2 h offer = 61 h > 60 (headroom 1 h)"
+      },
+      "ELIG_NO_SCHEDULE_OVERLAP": {
+        "pass": true,
+        "detail": "next scheduled shift 03-19 07:00 ET starts 36 h after offered start 19:00; a 2-h offer fits (may end exactly at shift start, OQ-21)"
+      },
+      "ELIG_MIN_OFFER_2H": {
+        "pass": true,
+        "detail": "offered 18:20-23:00 = 280 min, minus 40 min to come online = 240 min >= 120 (OQ-08)"
+      },
+      "SAFETY_ONE_OPEN_OFFER": {
+        "pass": true,
+        "detail": "0 open offer(s) in the offer log (max 1)"
+      },
+      "SAFETY_THREE_OFFERS_PER_WEEK": {
+        "pass": true,
+        "detail": "0 offer(s) since Mon 03-16 00:00 ET (max 3; source offer_log_iso_week_et)"
+      }
+    }
+  }
+]

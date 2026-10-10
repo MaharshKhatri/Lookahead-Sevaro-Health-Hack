@@ -46,7 +46,7 @@ export function routableNow(
   opts: RouteOptions = {},
 ): Routability {
   const p = state.physicians[physicianId];
-  const reasons: RouteCheck[] = [onShiftCheck(staffing, p, physicianId, nowMs), credentialCheck(staffing, physicianId, hospitalId)];
+  const reasons: RouteCheck[] = [onShiftCheck(staffing, p, physicianId, nowMs), credentialCheck(staffing, physicianId, hospitalId, nowMs)];
   if (p === undefined) {
     reasons.push({ rule: 'ROUTE_AGENT_VERIFIED', pass: false, affects: 'verified', detail: 'no presence signals yet (scheduled shift, no events)', because: [] });
   } else {
@@ -74,8 +74,13 @@ function onShiftCheck(staffing: StaffingModel, p: PhysicianState | undefined, ph
   return { rule: 'ROUTE_ON_SHIFT', pass: false, affects: 'routable', detail, because };
 }
 
-function credentialCheck(staffing: StaffingModel, physicianId: string, hospitalId: string): RouteCheck {
+function credentialCheck(staffing: StaffingModel, physicianId: string, hospitalId: string, nowMs: EpochMs): RouteCheck {
   const ok = isCredentialed(staffing, physicianId, hospitalId);
+  const scope = shiftOf(staffing, physicianId, nowMs)?.scopeHospitalIds ?? null;
+  if (ok && scope !== null && !scope.includes(hospitalId)) {
+    // Split-shift trap mitigation SCOPE (OQ-35): routing limited to the offer's need hospitals.
+    return { rule: 'ROUTE_CREDENTIALED', pass: false, affects: 'routable', detail: `credentialed at ${hospitalId} but outside split-shift scope (${scope.join(', ')})`, because: [] };
+  }
   return { rule: 'ROUTE_CREDENTIALED', pass: ok, affects: 'routable', detail: ok ? `credentialed at ${hospitalId}` : `not credentialed at ${hospitalId}`, because: [] };
 }
 
@@ -212,7 +217,7 @@ export function chooseRoute(state: NetworkState, staffing: StaffingModel, hospit
     }
     ranked.push(candidate(state, staffing, id, nowMs, r.verified));
   }
-  ranked.sort(compareCandidates);
+  ranked.sort(compareRouteCandidates);
   const top = ranked[0];
   return {
     hospitalId,
@@ -233,8 +238,10 @@ export function candidatePhysicians(state: NetworkState, staffing: StaffingModel
 
 function candidate(state: NetworkState, staffing: StaffingModel, id: string, nowMs: EpochMs, verified: boolean): RouteCandidate {
   const p = state.physicians[id];
-  const consults = p?.consultsThisShift ?? 0;
-  const dayShift = shiftOf(staffing, id, nowMs)?.dayShift ?? true;
+  const shift = shiftOf(staffing, id, nowMs);
+  // OQ-35 SEED: a seeded starting count is added to the consults actually taken this shift.
+  const consults = (p?.consultsThisShift ?? 0) + (shift?.seededConsults ?? 0);
+  const dayShift = shift?.dayShift ?? true;
   const limit = dayShift ? LOW_VOLUME_MAX_CONSULTS.day : LOW_VOLUME_MAX_CONSULTS.night;
   const tier = consults <= limit ? 'low_volume_priority' : 'fewest_consults';
   const lastAnsweredMs = p?.lastAnsweredMs ?? null;
@@ -246,9 +253,12 @@ function candidate(state: NetworkState, staffing: StaffingModel, id: string, now
   return { physicianId: id, tier, consults, lastAnsweredMs, dayShift, verified, why };
 }
 
-function compareCandidates(a: RouteCandidate, b: RouteCandidate): number {
-  const tier = (c: RouteCandidate) => (c.tier === 'low_volume_priority' ? 0 : 1);
-  const answered = (c: RouteCandidate) => c.lastAnsweredMs ?? Number.NEGATIVE_INFINITY;
+export type RankKey = Pick<RouteCandidate, 'tier' | 'consults' | 'lastAnsweredMs' | 'physicianId'>;
+
+/** Rules 3-4 order (OQ-26): low-volume tier, fewest consults, least recently answered (never first), id. */
+export function compareRouteCandidates(a: RankKey, b: RankKey): number {
+  const tier = (c: RankKey) => (c.tier === 'low_volume_priority' ? 0 : 1);
+  const answered = (c: RankKey) => c.lastAnsweredMs ?? Number.NEGATIVE_INFINITY;
   return tier(a) - tier(b) || a.consults - b.consults || answered(a) - answered(b) || compareIds(a.physicianId, b.physicianId);
 }
 

@@ -166,3 +166,72 @@ A warning that turns critical within 15 minutes stays one STANDARD_BREACH item w
 **D-40 Time travel past the last event.** `detect` at a later instant uses only the known events. Activity with no ending event stays open (calls, videos), so standards keep escalating. PHY-011's scheduled shift appears at 19:00, PHY-003 and PHY-006 drop off at 19:00, and the SYN-005 spike ages out of the trailing window by 19:30. Simulating future activity is the routing twin's job, not detection's.
 
 **D-41 Performance.** Labels for ET clock times are memoized, a timeline point's ET time of day is computed once, and the routability matrix is computed once and reused for routes and routable-now counts. `detect` at 18:20 takes about 7–10 ms median in isolation and about 18 ms with the full suite running in parallel, against a 30 ms target. `pnpm report:detect` renders `docs/DETECT_1820.md` from the same report.
+
+## Session 4: decide layer (2026-10-10)
+
+**D-42 Decide builds only on detect() and replay().** `decide(dataset, nowMs, opts?)` runs `detect`, then one longer coverage projection that reuses detect's state, staffing, demand and routability matrix (OQ-31). Everything after that is a pure function of those outputs: needs, ledger, recommended offer, trap, what-if, interventions and the top-issue recommendation. Nothing re-derives state, and no LLM is in the path. Decide-side brief constants live in `src/decide/brief-rules.ts`: 10 h rest, 60 h, 120 min, 1 open offer, 3 per week, 10-min expiry, and the decision rights.
+
+**D-43 Arrival confirmation (OQ-29).** `ScheduledShift` now records `source` (roster / scheduled arrival / split-shift offer), `confirmation` (roster / confirmed / expected), `confirmedBy`, `scopeHospitalIds` and `seededConsults`.
+- Coverage points and gaps carry `staffedConfirmed`, `staffedExpected` and `expectedIds`.
+- `CoverageProjection.classification` lists the HARD_GAP and AT_RISK intervals. AT_RISK intervals cite `COVERAGE_ARRIVAL_CONFIRMATION`; numbers are those at the interval start.
+- The existing `gaps` and `gapsExcludingArrivals` are unchanged, so the Session 3 expectations still hold.
+
+**D-44 Needs (OQ-30–OQ-32).** Three kinds:
+- `DEADLOCK_NOW`: one per hospital with routing deadlocks, from now to the first relief.
+- `HARD_GAP` and `AT_RISK`: from the classification.
+
+Needs start within the 120-min detection horizon, and their ends come from the 300-min decision projection. Only DEADLOCK_NOW and HARD_GAP qualify a hospital for offers; AT_RISK is advisory. Need ids are an FNV-1a hash of kind + hospital + start (`src/util/hash.ts`, shared with attention ids).
+
+**D-45 Eligibility ledger.** Every off-shift roster physician gets one entry, with each of the six brief rules plus the two offer limits evaluated and explained with numbers. A rule that cannot apply (rule 6 with no qualifying need) is `null`, not a pass.
+- Failures are attributed per rule (OQ-08 addendum): rule 6 is sized from needs + `MAX_OFFER_HOURS`, rule 5 from the next shift, rule 4 from the headroom.
+- The offer window is the minimum of the four caps, and the binding cap is reported.
+- Offer limits come from an offer log passed in (`opts.offerLog`; empty until Session 5's state machine). The weekly count uses the ISO week from Monday 00:00 ET (OQ-09).
+- Ranking follows OQ-34.
+
+**D-46 Recommended offer.** The top-ranked eligible entry becomes the offer:
+- its window, scope (OQ-35 SCOPE) and seed (OQ-35 SEED);
+- the value and the covered needs;
+- `why[]`: rank, value terms, binding cap and trap bullets;
+- the PHI-checked message.
+
+No eligible physician means `recommendedOffer: null`, a valid outcome at other instants.
+
+**D-47 Split-shift trap (OQ-35).** `analyzeTrap` compares the joiner's routing priority (rules 3–4, `compareRouteCandidates` from the routing module) at its start, before and after mitigation, at every credentialed hospital. Routing enforces SCOPE: `credentialCheck` fails with "outside split-shift scope" during a scoped shift. A scoped, seeded shift's consult count starts at the seed. Scheduled arrivals get an advisory SEED-only analysis.
+
+**D-48 What-if.** `projectWithOffers(dataset, nowMs, offers)` adds each accepted offer as a scoped, seeded `split_shift_offer` shift. The shift is expected until confirmed by `shift_started`, so an offer turns a HARD_GAP into AT_RISK rather than OK until the physician shows up. The function re-projects coverage over the decision horizon and recomputes needs with the start filter at the decision-projection end. `decide().whatIf` compares before and after over the same 300 min:
+- `compareNeeds` reports each before-need as closed, downgraded, shortened or unchanged, with the after segments;
+- `introducedNeeds` lists after-needs with no before counterpart;
+- `routableAtOfferStart` counts routable physicians at each scope hospital at the offer start.
+
+Found while building it: filtering after-needs to the 120-min start window hid the SYN-005 HARD_GAP that reopens at 22:35 when the 4-h offer ends. It made a "shortened" gap look "downgraded". The comparison now uses the full decision projection.
+
+**D-49 Offer message and PHI guard.**
+- `draftOfferMessage` produces exactly five lines: the operations team, hospital names, start + hours + end, "Reason: projected coverage gap.", and reply/expiry.
+- `findPhiViolations` / `assertNoPHI` check a word-boundary denylist (consult and event ids, record numbers, patient, age/sex including "67-year-old", clinical and imaging terms), plus an optional whitelist (vocabulary + allowed phrases such as hospital names).
+- The message is checked in strict whitelist mode, and `draftOfferMessage` throws rather than return text that fails.
+- "triaged", "stage" and "manage" do not trip the guard. "neuro*" does, by design.
+- Fixed in this session: the age pattern missed hyphenated ages ("67-year-old").
+
+**D-50 Interventions and decision rights.** Interventions are generated for the top `INTERVENTION_TOP_ITEMS = 10` attention items and for every need:
+- **ROUTING_DEADLOCK:** reassign, escalate and offer.
+- **Breach:** reassign and escalate, plus an offer if the consult is unassigned. Two exceptions: note completion gets a note handoff, and imaging pending gets escalate only, since imaging is a hospital-side step.
+- **Coverage gap or spike:** escalate and offer.
+- **Open notes:** a note handoff plan, one per physician.
+- **Signal conflict:** TEMP_UNAVAILABLE_WITH_ASSIGNED gets reassign and escalate; other flags get VERIFY_PRESENCE.
+- **AT_RISK need:** VERIFY_PRESENCE for each expected arrival.
+- **HARD_GAP or deadlock need:** escalate and offer.
+
+Interventions with the same kind and targets merge, keeping the union of links and why-bullets.
+
+Reassignment uses `chooseRoute` for that consult, excluding the current assignee. With no candidate it says "No routable candidate: fall through to escalation." and lists each blocker's failed rules.
+
+Decision rights follow brief "Users and Decision Rights":
+- The coordinator proposes.
+- The clinical lead approves escalations and offers.
+- The off-shift physician accepts offers.
+- `automationAllowed` is true only for VERIFY_PRESENCE, an internal coordinator alert ("Automated actions are permitted only for low-risk steps").
+
+**D-51 Top-issue recommendation.** `recommendForTopIssue` bundles the interventions linked to the #1 attention item in the order reassign → escalate → offer → handoff → verify, with a four-line rationale. At 18:20: CON-2105 deadlock at SYN-010 → no reassignment candidate (PHY-002 on video, PHY-008 Temporarily Unavailable) → escalate → split-shift offer to PHY-009, 18:35–22:35, scoped to SYN-005/008/010, seeded at 14.
+
+**D-52 Performance.** `decide` at 18:20 takes about 17–19 ms median (detect about 8 ms, plus a second 300-min projection, the what-if projection, and the ledger and interventions), against a 40 ms target (`test/decide.determinism.test.ts`). The output is identical across 20 seeded shuffles of the event order. `pnpm report:decide` renders `docs/DECIDE_1820.md`.
+

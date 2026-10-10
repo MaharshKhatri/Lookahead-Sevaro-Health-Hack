@@ -62,7 +62,19 @@ export function detect(dataset: Dataset, nowMs: EpochMs, opts: DetectOptions = {
 
 export { buildAttention, type AttentionItem, type AttentionKind, type Severity } from './attention';
 export { OPERATIONAL_STANDARDS, CALL_COOLDOWN_MS, LOW_VOLUME_MAX_CONSULTS, MIN_PROJECTION_HORIZON_MIN, type StandardCode, type StandardDef } from './brief-rules';
-export { projectCoverage, type CoverageProjection, type CoverageGap, type CoveragePoint, type CoverageCause, type HospitalCoverageAt } from './coverage';
+export {
+  projectCoverage,
+  coverageStatus,
+  intervalCauses,
+  type CoverageProjection,
+  type CoverageGap,
+  type CoveragePoint,
+  type CoverageCause,
+  type CoverageInterval,
+  type CoverageStatus,
+  type HospitalCoverageAt,
+  type ProjectionOptions,
+} from './coverage';
 export { evaluateDemand, type DemandEvaluation } from './demand';
 export {
   routableNow,
@@ -70,6 +82,8 @@ export {
   candidatePhysicians,
   findRoutingDeadlocks,
   blockingExclusions,
+  compareRouteCandidates,
+  type RankKey,
   type Routability,
   type RouteCheck,
   type RouteChoice,
@@ -77,5 +91,5 @@ export {
   type RouteOptions,
   type DeadlockFinding,
 } from './routing';
-export { buildStaffingModel, isDayShift, shiftsAt, type StaffingModel, type ScheduledShift } from './staffing';
+export { buildStaffingModel, confirmationEvent, isDayShift, shiftCountsAt, shiftsAt, withShifts, etClock, etClockS, type StaffingModel, type ScheduledShift } from './staffing';
 export { evaluateStandards, evaluateOpenNotes, type StandardEvaluation, type OpenNotesEvaluation, type Level } from './standards';

@@ -34,6 +34,13 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 | OQ-26 | Ordering inside routing rule 3's low-volume tier | Open |
 | OQ-27 | Scheduled arrivals from the off-shift roster | Supported |
 | OQ-28 | Self-reported status during a projection | Open |
+| OQ-29 | Arrival confirmation: expected vs confirmed staffing | Open |
+| OQ-30 | Which needs make a "hospital with the gap" | Supported |
+| OQ-31 | Decision horizon for sizing offers | Supported |
+| OQ-32 | How long a routing deadlock lasts | Open |
+| OQ-33 | Offer window length and "value of the offer" | Open |
+| OQ-34 | Ranking several eligible physicians | Open |
+| OQ-35 | Split-shift trap mitigation | Open |
 
 ---
 
@@ -89,6 +96,12 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** "Offers are at least 2 hours long. The estimated time to come online counts against the value of the offer."
 - **Default:** the offered window minus `est_minutes_to_online` must be at least 120 min. Example: PHY-009, with 15 min to online, needs an offer of at least 2 h 15 min. `OFFER_TIME_TO_ONLINE_COUNTS_AGAINST_MINIMUM = true`.
 - **Verify:** no snapshot evidence. With either reading, PHY-009 stays the single eligible physician for the 19:00 SYN-005 gap (36 h + 2.25 h is under 60 h).
+- **Addendum (Session 4):** the offered start is `now + est_minutes_to_online`, so the rule is `(end − now) − est_minutes_to_online = end − start ≥ 120 min`. The time to online is subtracted exactly once. Each rule is sized on its own so a failure is attributed to the rule that causes it:
+  - rule 6 sizes the window from the covered needs and `MAX_OFFER_HOURS` only;
+  - rule 5 checks that a 2-h offer fits before `next_shift_start`;
+  - rule 4 checks that the 60-h headroom is at least 2 h.
+
+  The final window is the minimum of all four caps (OQ-33). At 18:20: PHY-009 is offered 18:20–22:35 = 255 min, minus 15 min = 240 min, so it passes.
 
 ### OQ-09 Source of per-week offer counts
 - **Brief:** "no more than 3 offers per physician per week".
@@ -241,3 +254,64 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** silent on how long a self-reported status lasts.
 - **Default:** a physician's current status persists through the projection. PHY-008 (Temporarily Unavailable since 18:12:40) is not counted at SYN-006/007/010/011 for the whole horizon. `PROJECTION_HOLDS_CURRENT_STATUS = true`.
 - **Verify:** no snapshot evidence. SYN-010 at 19:00 is 1/1 (PHY-002) under either reading. If PHY-008 came back, SYN-010 would be 2/1 until 20:00.
+
+### OQ-29 Arrival confirmation: expected vs confirmed staffing
+- **Brief:** "Availability is inferred", and the roster note "A scheduled night shift is not a split-shift offer". The brief never says whether a scheduled arrival should be trusted before the physician actually shows up.
+- **Default:** scheduled arrivals (OQ-27) and accepted split-shift offers count in staffed capacity from their start, but are **expected** until a known `shift_started` event dated at or after their scheduled start (minus `ARRIVAL_CONFIRMATION_EARLY_TOLERANCE_MIN = 0`) confirms them. On-shift roster physicians are their own category. Each projection point and gap reports `staffedConfirmed + staffedExpected = staffed`. Coverage status:
+  - `HARD_GAP`: staffed < required.
+  - `AT_RISK`: confirmed < required ≤ staffed, and margin (staffed − required) ≤ `AT_RISK_MAX_MARGIN = 0`.
+  - `OK`: otherwise.
+- **Effect at 18:20:** SYN-005 is AT_RISK 19:00–20:00 (1 confirmed PHY-005 + 1 expected PHY-011 vs 2). Five more hospitals go AT_RISK at 20:00 because they depend on PHY-011 or PHY-012 alone or at zero margin.
+- **Verify:** the stream has no `shift_started` for PHY-011 or PHY-012, whose shifts are in the future. `test/arrivals.test.ts` appends one for PHY-011 at 19:00 and checks that SYN-004 at 20:00 goes from AT_RISK to OK once the event is known. A `shift_started` dated before the scheduled start does not confirm.
+
+### OQ-30 Which needs make a "hospital with the gap"
+- **Brief:** eligibility rule 2: "They are credentialed at one or more of the hospitals with the gap. Being credentialed elsewhere does not help." Hidden situation: "Exactly one off-shift physician is fully eligible to cover the projected gap right now. Several others look eligible but fail one rule each."
+- **Default:** only `DEADLOCK_NOW` and `HARD_GAP` needs qualify a hospital for split-shift offers. `AT_RISK` (a gap that disappears if an expected arrival shows up) is advisory: it triggers a presence check, and it counts in an offer's value (OQ-33), but not in eligibility. `ELIGIBILITY_NEED_KINDS = ['DEADLOCK_NOW', 'HARD_GAP']`.
+- **Alternative checked:** if AT_RISK qualified, PHY-010 (credentialed at SYN-003, AT_RISK 20:00–21:00) would also be eligible: 2 eligible physicians, which contradicts "exactly one". It would also change PHY-012 from three failed rules to two (opt-in, overlap).
+- **Verify:** under the default exactly one physician (PHY-009) is eligible (`test/eligibility.golden.test.ts`).
+
+### OQ-31 Decision horizon for sizing offers
+- **Brief:** coverage must be projected "at least 90 minutes" (Demonstrate #4). Offers must be at least 2 hours long (eligibility rule 6). The brief says nothing about how far ahead an offer's end may be justified.
+- **Question:** a need traced only to the 120-min detection horizon (20:20) ends no later than 20:20. Every offer would then be under 2 h effective (PHY-009: 18:35–20:20 = 105 min), so nobody would be eligible.
+- **Default:** needs must *start* within the detection horizon (`PROJECTION_HORIZON_MIN = 120`). Their *ends* are traced in a longer decision projection of `DECISION_HORIZON_MIN = 300` (to 23:20). A need still open there ends `'beyond_horizon'`, which caps at 23:20 for arithmetic. The what-if compares before and after over the whole 300 min, so a gap that reopens when an offer ends (SYN-005 HARD_GAP from 22:35) is shown, not hidden by the 120-min start filter.
+- **Alternative checked:** with `decisionHorizonMin: 120`, no off-shift physician is eligible (PHY-009 fails rule 6 at 105 min).
+- **Verify:** the brief's single eligible physician exists under the default.
+
+### OQ-32 How long a routing deadlock lasts
+- **Brief:** routing rule 5: "If no physician is eligible, the request waits and retries every 5 minutes". Silent on when it will end.
+- **Default:** a `DEADLOCK_NOW` need runs from now to the first known relief: the earliest scheduled arrival or accepted offer starting after now that counts at that hospital (credentialed and, for an offer, in scope), whether confirmed or expected. With no known relief it runs `DEADLOCK_DEFAULT_WINDOW_MIN = 60` minutes.
+- **Effect at 18:20:** SYN-005 (CON-2114) runs to 19:00 (PHY-011). SYN-010 (CON-2105) runs to 20:00 (PHY-012).
+- **Note:** PHY-012's only qualifying need (SYN-010) therefore ends when PHY-012's own shift starts, so PHY-012 also fails rule 6 (100 min). This is reported as a surprise; the expectations were not edited.
+
+### OQ-33 Offer window length and "value of the offer"
+- **Brief:** "Offers are at least 2 hours long. The estimated time to come online counts against the value of the offer." No maximum length; no definition of value.
+- **Default window:**
+  - start = now + `est_minutes_to_online`;
+  - end = min(latest end of the covered qualifying needs, start + `MAX_OFFER_HOURS = 4`, `next_shift_start`, start + (60 − hours_worked_last_7d) h).
+  - Each cap and the binding one are reported.
+- **Default value:** need-minutes covered inside [start, end] at the scope hospitals, weighted by need kind: `NEED_VALUE_WEIGHTS = {DEADLOCK_NOW: 3, HARD_GAP: 2, AT_RISK: 1}`. The time to online falls outside the window, so it reduces value.
+- **Effect at 18:20:** PHY-009, 18:35–22:35, value 1095 = DEADLOCK 330 + HARD_GAP 550 + AT_RISK 215.
+- **Verify:** no data. The weights only matter when more than one physician is eligible.
+
+### OQ-34 Ranking several eligible physicians
+- **Brief:** silent; the roster's `offers_declined_last_30d` and `est_minutes_to_online` suggest signals.
+- **Default:** `ELIGIBLE_RANK_ORDER`, in order:
+  1. value descending;
+  2. minutes to online ascending;
+  3. declines in the last 30 days ascending;
+  4. physician id.
+- **Verify:** only one physician is eligible at 18:20. The order is covered by synthetic tests (`test/eligibility.rules.test.ts`).
+
+### OQ-35 Split-shift trap mitigation
+- **Brief:** "Your solution must address this, for example by seeding a starting consult count, limiting the joining physician to the gap hospitals, or another approach you can justify."
+- **Default:** `TRAP_MITIGATION = 'scope_and_seed'`, applied to every split-shift offer:
+  - **SCOPE:** routing is limited to the hospitals of the covered qualifying needs for the offer window. The routing engine refuses out-of-scope hospitals with "outside split-shift scope".
+  - **SEED:** the joiner starts at the median consult count (floor for an even count) of on-shift peers at the offer start who are credentialed at the scope hospitals. `TRAP_SEED_STATISTIC = 'median_floor'`.
+  - Scheduled arrivals are not ours to scope. They get an advisory SEED analysis only (`arrivalTraps`).
+  - The comparison is a static priority snapshot under routing rules 3–4 with peer counts as of now. The Monte Carlo routing twin comes later.
+- **Effect at 18:20:**
+  - Unmitigated, PHY-009 at 0 consults would be first pick at all four credentialed hospitals (SYN-004/005/008/010; night low-volume limit 4, OQ-10).
+  - With SCOPE, SYN-004 (Meadowlands, AT_RISK only) is excluded.
+  - With SEED 14 (median of 10, 12, 14, 14, 15, 15), PHY-009 is first pick only at SYN-005, where it ties PHY-003 at 14 and has never answered.
+- **Verify:** not in the data; it is a design choice the brief explicitly allows.
+

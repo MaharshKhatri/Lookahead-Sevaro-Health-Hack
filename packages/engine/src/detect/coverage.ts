@@ -1,12 +1,12 @@
 import { DateTime } from 'luxon';
-import { COVERAGE_EXCLUDED_STATUSES, DEMAND_SPIKE_PROJECTION, PROJECTION_HOLDS_CURRENT_STATUS } from '../policy';
+import { AT_RISK_MAX_MARGIN, COVERAGE_EXCLUDED_STATUSES, DEMAND_SPIKE_PROJECTION, PROJECTION_HOLDS_CURRENT_STATUS } from '../policy';
 import type { RuleCode } from '../replay/rules';
 import type { EventRef, NetworkState } from '../replay/types';
 import { ET_ZONE, etDateOf, etWallClockToEpoch } from '../time';
 import type { CoverageRequirement, Dataset, EpochMs } from '../types';
 import type { DemandEvaluation } from './demand';
 import { candidatePhysicians, routableNow, type Routability } from './routing';
-import { etClock, isCredentialed, shiftsAt, type StaffingModel } from './staffing';
+import { etClock, shiftCountsAt, shiftsAt, type StaffingModel } from './staffing';
 
 /**
  * Staffed-capacity coverage (OQ-24(a)): brief "Coverage and Split-Shift
@@ -22,6 +22,11 @@ export interface HospitalCoverageAt {
   readonly required: number;
   readonly staffed: number;
   readonly staffedIds: readonly string[];
+  /** OQ-29: counted from the roster or a confirmed arrival. staffed = staffedConfirmed + staffedExpected. */
+  readonly staffedConfirmed: number;
+  /** OQ-29: counted only because an arrival or offer is expected (no shift_started known yet). */
+  readonly staffedExpected: number;
+  readonly expectedIds: readonly string[];
   /** Counted but agent offline (OQ-02). */
   readonly unverifiedIds: readonly string[];
   /** Counted because a scheduled shift has started (OQ-27). */
@@ -51,10 +56,30 @@ export interface CoverageGap {
   readonly endMs: EpochMs | 'beyond_horizon';
   readonly required: number;
   readonly staffed: number;
+  readonly staffedConfirmed: number;
+  readonly staffedExpected: number;
   readonly shortfall: number;
   readonly maxShortfall: number;
   readonly causes: readonly CoverageCause[];
   readonly whoRemains: readonly string[];
+  readonly rule: RuleCode;
+}
+
+export type CoverageStatus = 'OK' | 'AT_RISK' | 'HARD_GAP';
+
+/** A merged run of timeline points with the same non-OK status at one hospital (OQ-29). */
+export interface CoverageInterval {
+  readonly hospitalId: string;
+  readonly hospitalName: string;
+  /** HARD_GAP: confirmed + expected < required. AT_RISK: met only via expected arrivals, margin <= AT_RISK_MAX_MARGIN. */
+  readonly status: 'AT_RISK' | 'HARD_GAP';
+  readonly startMs: EpochMs;
+  readonly endMs: EpochMs | 'beyond_horizon';
+  readonly required: number;
+  readonly staffedConfirmed: number;
+  readonly staffedExpected: number;
+  readonly expectedIds: readonly string[];
+  readonly staffedIds: readonly string[];
   readonly rule: RuleCode;
 }
 
@@ -65,6 +90,8 @@ export interface CoverageProjection {
   readonly timelineExcludingArrivals: readonly CoveragePoint[];
   readonly gaps: readonly CoverageGap[];
   readonly gapsExcludingArrivals: readonly CoverageGap[];
+  /** OQ-29 classification of the default timeline: every HARD_GAP and AT_RISK interval. */
+  readonly classification: readonly CoverageInterval[];
   /** Routing rules 1-2 now (OQ-24(b)): count and ids of routable credentialed physicians per hospital. */
   readonly routableNow: Readonly<Record<string, number>>;
   readonly routableNowIds: Readonly<Record<string, readonly string[]>>;
@@ -99,6 +126,7 @@ export function projectCoverage(
     timelineExcludingArrivals,
     gaps: findGaps(dataset, state, staffing, timeline, demandById),
     gapsExcludingArrivals: findGaps(dataset, state, staffing, timelineExcludingArrivals, demandById),
+    classification: classifyCoverage(dataset, timeline),
     routableNow: Object.fromEntries(Object.entries(routable).map(([h, ids]) => [h, ids.length])),
     routableNowIds: routable,
   };
@@ -138,9 +166,10 @@ function pointAt(dataset: Dataset, state: NetworkState, staffing: StaffingModel,
   const sod = local.hour * 3600 + local.minute * 60 + local.second;
   const perHospital: Record<string, HospitalCoverageAt> = {};
   for (const h of dataset.hospitals) {
-    const credentialed = onShift.filter((s) => isCredentialed(staffing, s.physicianId, h.hospitalId));
+    const credentialed = onShift.filter((s) => shiftCountsAt(staffing, s, h.hospitalId));
     const excluded = credentialed.filter((s) => isExcludedByStatus(state, s.physicianId));
     const counted = credentialed.filter((s) => !isExcludedByStatus(state, s.physicianId));
+    const expected = counted.filter((s) => s.confirmation === 'expected');
     const blockMin = blockMinimum(dataset, h.hospitalId, sod).minimum;
     const spikeAdd = spiking.has(h.hospitalId) ? 1 : 0;
     perHospital[h.hospitalId] = {
@@ -149,6 +178,9 @@ function pointAt(dataset: Dataset, state: NetworkState, staffing: StaffingModel,
       required: blockMin + spikeAdd,
       staffed: counted.length,
       staffedIds: counted.map((s) => s.physicianId),
+      staffedConfirmed: counted.length - expected.length,
+      staffedExpected: expected.length,
+      expectedIds: expected.map((s) => s.physicianId),
       unverifiedIds: counted.filter((s) => state.physicians[s.physicianId]?.agent.online === false).map((s) => s.physicianId),
       scheduledArrivalIds: counted.filter((s) => s.source === 'scheduled_arrival').map((s) => s.physicianId),
       tempUnavailableIds: excluded.map((s) => s.physicianId),
@@ -198,6 +230,8 @@ function findGaps(
         endMs: timeline[i]?.tMs ?? 'beyond_horizon',
         required: startAt.required,
         staffed: startAt.staffed,
+        staffedConfirmed: startAt.staffedConfirmed,
+        staffedExpected: startAt.staffedExpected,
         shortfall: startAt.required - startAt.staffed,
         maxShortfall,
         causes: gapCauses(state, staffing, timeline[startIdx - 1], start, h.hospitalId, demandById.get(h.hospitalId)),
@@ -264,4 +298,62 @@ function routableCounts(
     out[h.hospitalId] = ids.filter((p) => (routability?.[h.hospitalId]?.[p] ?? routableNow(state, staffing, p, h.hospitalId, nowMs)).routable);
   }
   return out;
+}
+
+/** OQ-29: HARD_GAP when confirmed + expected < required; AT_RISK when met only via expected arrivals with margin <= AT_RISK_MAX_MARGIN. */
+export function coverageStatus(x: HospitalCoverageAt): CoverageStatus {
+  if (x.staffed < x.required) return 'HARD_GAP';
+  if (x.staffedConfirmed < x.required && x.staffed - x.required <= AT_RISK_MAX_MARGIN) return 'AT_RISK';
+  return 'OK';
+}
+
+function classifyCoverage(dataset: Dataset, timeline: readonly CoveragePoint[]): CoverageInterval[] {
+  const out: CoverageInterval[] = [];
+  for (const h of dataset.hospitals) {
+    let i = 0;
+    while (i < timeline.length) {
+      const at = timeline[i]?.perHospital[h.hospitalId];
+      const status = at === undefined ? 'OK' : coverageStatus(at);
+      if (at === undefined || status === 'OK') {
+        i++;
+        continue;
+      }
+      const start = timeline[i];
+      while (i < timeline.length) {
+        const cur = timeline[i]?.perHospital[h.hospitalId];
+        if (cur === undefined || coverageStatus(cur) !== status) break;
+        i++;
+      }
+      if (start === undefined) continue;
+      out.push({
+        hospitalId: h.hospitalId,
+        hospitalName: h.hospitalName,
+        status,
+        startMs: start.tMs,
+        endMs: timeline[i]?.tMs ?? 'beyond_horizon',
+        required: at.required,
+        staffedConfirmed: at.staffedConfirmed,
+        staffedExpected: at.staffedExpected,
+        expectedIds: at.expectedIds,
+        staffedIds: at.staffedIds,
+        // Numbers are those at the interval start; AT_RISK exists only because of OQ-29 arrival confirmation.
+        rule: status === 'AT_RISK' ? 'COVERAGE_ARRIVAL_CONFIRMATION' : 'COVERAGE_STAFFED_CAPACITY',
+      });
+    }
+  }
+  return out.sort((a, b) => a.startMs - b.startMs || (a.hospitalId < b.hospitalId ? -1 : 1));
+}
+
+/** Causes for a status change at `startMs` (compared with the previous timeline point), for gaps and AT_RISK intervals. */
+export function intervalCauses(
+  state: NetworkState,
+  staffing: StaffingModel,
+  timeline: readonly CoveragePoint[],
+  startMs: EpochMs,
+  hospitalId: string,
+  demand: DemandEvaluation | undefined,
+): CoverageCause[] {
+  const idx = timeline.findIndex((p) => p.tMs === startMs);
+  const start = timeline[idx];
+  return start === undefined ? [] : gapCauses(state, staffing, timeline[idx - 1], start, hospitalId, demand);
 }

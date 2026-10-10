@@ -199,3 +199,52 @@ export const ATTENTION_SEVERITY_BANDS = [
   { severity: 'medium', minScore: 50 },
   { severity: 'low', minScore: Number.NEGATIVE_INFINITY },
 ] as const;
+
+/**
+ * OQ-29: a scheduled arrival (or accepted offer) is EXPECTED until a shift_started
+ * for that physician is known and dated at/after the scheduled start minus this
+ * tolerance; then CONFIRMED. A hospital interval is AT_RISK when its requirement
+ * is met only thanks to expected arrivals and the margin is at most AT_RISK_MAX_MARGIN.
+ */
+export const ARRIVAL_CONFIRMATION_EARLY_TOLERANCE_MIN = 0;
+export const AT_RISK_MAX_MARGIN = 0;
+
+/**
+ * OQ-30: needs that make a hospital one of "the hospitals with the gap" for
+ * split-shift eligibility. AT_RISK (requirement met by an unconfirmed scheduled
+ * arrival) is advisory: confirm the arrival, do not offer a split shift for it.
+ */
+export const ELIGIBILITY_NEED_KINDS: readonly ('DEADLOCK_NOW' | 'HARD_GAP' | 'AT_RISK')[] = ['DEADLOCK_NOW', 'HARD_GAP'];
+
+/**
+ * OQ-31: needs must start within the detection horizon (PROJECTION_HORIZON_MIN),
+ * but their end is traced in a longer decision projection so an offer window
+ * (up to MAX_OFFER_HOURS after time to come online) is not cut at 120 min.
+ */
+export const DECISION_HORIZON_MIN = 300;
+
+/** OQ-32: a DEADLOCK_NOW need lasts until the first arrival/offer credentialed (and in scope) at that hospital starts; otherwise this long. */
+export const DEADLOCK_DEFAULT_WINDOW_MIN = 60;
+
+/** OQ-33: need severity by kind, and the per-minute weights used to value an offer's overlap with needs. */
+export const NEED_KIND_SEVERITY = { DEADLOCK_NOW: 'critical', HARD_GAP: 'high', AT_RISK: 'medium' } as const;
+export const NEED_VALUE_WEIGHTS = { DEADLOCK_NOW: 3, HARD_GAP: 2, AT_RISK: 1 } as const;
+
+/** OQ-33: longest split-shift offer we construct, in hours (the brief sets only a 2-h minimum). */
+export const MAX_OFFER_HOURS = 4;
+
+/** OQ-34: rank eligible physicians by value desc, then shorter time to come online, then fewer declines in 30 days, then id. */
+export const ELIGIBLE_RANK_ORDER = 'value_then_time_to_online_then_declines' as const;
+
+/**
+ * OQ-35: split-shift trap mitigation. SCOPE limits the joiner's routing (and
+ * counted coverage) to the offer's need hospitals for the offer window; SEED
+ * starts their consult count at the median consults-this-shift of on-shift
+ * physicians credentialed at those hospitals (even count: floor of the two
+ * middle values' mean). Default: both.
+ */
+export const TRAP_MITIGATION: 'scope' | 'seed' | 'scope_and_seed' = 'scope_and_seed';
+export const TRAP_SEED_STATISTIC = 'median_floor' as const;
+
+/** Design choice (DECISIONS D-50): interventions are generated for this many top attention items, plus every need. */
+export const INTERVENTION_TOP_ITEMS = 10;

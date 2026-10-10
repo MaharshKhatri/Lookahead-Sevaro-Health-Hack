@@ -10,3 +10,4 @@ export { parseInstant, parseClockTime, parseTimeBlock } from './data/fields';
 export type { PendingEvent } from './data/events';
 export * from './replay';
 export * from './detect';
+export * from './decide';

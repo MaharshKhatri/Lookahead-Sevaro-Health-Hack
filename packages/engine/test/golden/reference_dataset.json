@@ -1,0 +1,38 @@
+{
+  "_comment": "Expected facts for the reference data package (data/raw), taken from docs/DATA_PROFILE.md (pnpm recon). Expected answers live only in test/golden (CLAUDE.md rule 5).",
+  "rowCounts": {
+    "event_stream.csv": 1164,
+    "hospitals.csv": 12,
+    "physicians_on_shift.csv": 8,
+    "physicians_off_shift_roster.csv": 6,
+    "credentialing_matrix.csv": 14,
+    "baseline_hourly_volume.csv": 288,
+    "coverage_requirements.csv": 36,
+    "snapshot_physicians_1820.csv": 8,
+    "snapshot_open_consults_1820.csv": 18
+  },
+  "eventTypeCounts": {
+    "consult_received": 103,
+    "consult_triaged": 102,
+    "physician_assigned": 100,
+    "incoming_call_started": 99,
+    "incoming_call_ended": 98,
+    "note_started": 87,
+    "note_signed": 85,
+    "camera_active": 82,
+    "video_started": 81,
+    "camera_inactive": 79,
+    "video_ended": 78,
+    "imaging_requested": 54,
+    "imaging_returned": 53,
+    "outgoing_call_started": 19,
+    "outgoing_call_ended": 18,
+    "physician_status_changed": 12,
+    "shift_started": 8,
+    "routing_attempt_failed": 4,
+    "agent_heartbeat_lost": 1,
+    "incoming_call_ringing": 1
+  },
+  "duplicateEventIds": ["EVT-00529"],
+  "snapshotLabel": "1820"
+}

@@ -1,0 +1,120 @@
+import { ET_ZONE } from './time';
+import type { ConsultStage, EventType, SelfReportedStatus } from './types';
+
+/**
+ * Default interpretations where the brief (docs/brief_c2.md) is silent or
+ * ambiguous. Each constant names its docs/OPEN_QUESTIONS.md entry and is
+ * logged in docs/DECISIONS.md (CLAUDE.md rule 1). Rules implemented in later
+ * sessions must read these constants instead of re-deciding.
+ */
+
+/** OQ-01: coverage_requirements blocks are ET wall-clock, start-inclusive, end-exclusive; "22:00-07:00" wraps midnight. */
+export const COVERAGE_BLOCK_BOUNDARY = 'start_inclusive_end_exclusive' as const;
+
+/**
+ * OQ-02: "available" for coverage = on shift + credentialed at the hospital +
+ * self-reported status not excluded below. A physician busy on a call/video
+ * still counts (busy is momentary; coverage is staffing). Agent-offline
+ * physicians count but are flagged (brief: "Agent offline ... Surface the risk").
+ */
+export const COVERAGE_EXCLUDED_STATUSES: readonly SelfReportedStatus[] = ['Temporarily Unavailable'];
+export const COVERAGE_COUNTS_BUSY_PHYSICIANS = true;
+export const COVERAGE_COUNTS_AGENT_OFFLINE = true;
+
+/** OQ-03: baseline_hourly_volume hour buckets are ET (header: hour_start_et). */
+export const BASELINE_HOUR_ZONE = ET_ZONE;
+
+/**
+ * OQ-04: two rows are the same event when event_id matches and every column
+ * except ingested_at is identical. Keep the earliest-ingested copy. Same
+ * event_id with different content is a conflict: keep both, raise a warning.
+ */
+export const DUPLICATE_EVENT_KEY = 'event_id_and_payload' as const;
+
+/** OQ-05: a stage is at warning/critical when elapsed >= threshold (exact ms; identical to floored minutes >= threshold). */
+export const BREACH_COMPARISON = 'gte' as const;
+
+/** OQ-06: an open note (Documentation) does not make a physician busy for routing. */
+export const DOCUMENTATION_COUNTS_AS_BUSY = false;
+
+/** OQ-07: the 2-minute "ended a call" cooldown applies to hospital calls only, not video. */
+export const CALL_COOLDOWN_INCLUDES_VIDEO = false;
+
+/** OQ-08: the 2-hour minimum is measured after subtracting est_minutes_to_online from the offered window. */
+export const OFFER_TIME_TO_ONLINE_COUNTS_AGAINST_MINIMUM = true;
+
+/** OQ-09: offers-per-week come from our own offer log (ISO week starting Monday 00:00 ET), starting at 0. */
+export const WEEKLY_OFFER_COUNT_SOURCE = 'offer_log_iso_week_et' as const;
+
+/**
+ * OQ-10: a shift (or a split-shift offer) that starts in [06:00, 18:00) ET is a
+ * day shift; otherwise night. Used for the routing low-volume threshold
+ * because physicians_on_shift.csv has no role column.
+ */
+export const DAY_SHIFT_START_WINDOW_ET = { startSecondOfDay: 6 * 3600, endSecondOfDay: 18 * 3600 } as const;
+
+/** OQ-11: snapshot consults_this_shift / calls_this_shift count these event types (ringing is not a call). */
+export const CONSULT_COUNT_EVENT_TYPES: readonly EventType[] = ['physician_assigned'];
+export const CALL_COUNT_EVENT_TYPES: readonly EventType[] = ['incoming_call_started', 'outgoing_call_started'];
+
+/** OQ-12: replay always orders by event_time; the UI flags an event as "late" when ingested_at - event_time exceeds this. */
+export const LATE_EVENT_FLAG_LAG_MS = 60_000;
+
+/** OQ-13: date-less clock values in the files are ET, on the ET date of the latest event_time. */
+export const SNAPSHOT_CLOCK_ZONE = ET_ZONE;
+
+/** OQ-14: self-reported status and consult type exist only in the description text. */
+export const STATUS_DESCRIPTION_PREFIX = 'Self-reported status: ';
+export const CONSULT_TYPE_DESCRIPTION_SUFFIX = ' consult request received';
+
+/** OQ-15: derived-state label when several signals are active at once (first match wins). */
+export const DERIVED_STATE_PRECEDENCE = [
+  'incoming_call',
+  'outgoing_call',
+  'video',
+  'camera_without_synapse',
+  'temporarily_unavailable',
+  'documentation',
+  'in_meeting',
+  'available',
+] as const;
+
+/** OQ-16: after agent_heartbeat_lost the agent is offline until that physician's next camera_active/camera_inactive. */
+export const AGENT_BACK_ONLINE_ON_CAMERA_EVENT = true;
+
+/** OQ-17: a ringing phone lasts until that physician's next call event; no timeout is assumed. */
+export const RINGING_TIMEOUT_MS: number | null = null;
+
+/**
+ * OQ-18: brief "Operational Standards" times Note Pending + Documentation "from end of video or call":
+ * the anchor is the later of the last video_ended and the last call end. A call end whose description
+ * contains this marker moves a phone-only consult to Note Pending.
+ */
+export const NOTE_TIMER_ANCHOR = 'latest_video_or_call_end' as const;
+export const PHONE_ONLY_DESCRIPTION_MARKER = 'phone-only';
+
+/**
+ * OQ-19: demand spike = consults received in (t - 60 min, t] is strictly
+ * greater than p90_consults for the ET hour containing t. A hospital in spike
+ * at `now` keeps the +1 requirement for the whole projection horizon.
+ */
+export const DEMAND_SPIKE_WINDOW_MS = 60 * 60_000;
+export const DEMAND_SPIKE_COMPARISON = 'gt' as const;
+export const DEMAND_SPIKE_PROJECTION = 'hold_from_now_through_horizon' as const;
+
+/** OQ-20: hours_worked_last_7d is taken as-is at load time; offered hours are added to it. */
+export const HOURS_7D_AS_OF = 'roster_value_at_load' as const;
+
+/** OQ-21: an offer may end exactly when the physician's next shift starts (intervals are half-open). */
+export const OFFER_MAY_END_AT_NEXT_SHIFT_START = true;
+
+/** OQ-22: "open notes" = assigned consults in these stages; "within 60 min" includes exactly 60. */
+export const OPEN_NOTE_STAGES: readonly ConsultStage[] = ['Note Pending', 'Documentation'];
+export const OPEN_NOTES_WINDOW_INCLUSIVE = true;
+
+/**
+ * OQ-23: a physician with an assigned consult that has had no call yet is
+ * treated as having a phone ringing for it (brief routing rule 2), so routing
+ * skips them until that first call starts.
+ */
+export const PENDING_FIRST_CONTACT_COUNTS_AS_RINGING = true;

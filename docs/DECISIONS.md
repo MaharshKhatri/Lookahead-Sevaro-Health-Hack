@@ -313,3 +313,106 @@ It then emits `offer_superseded` for same-slot offers and `offer_cancelled` (cau
 **D-72 Stale-feed banner.** Per the Session 6 spec, the console shows "No new Sevaro events since HH:MM:SS — state is frozen at last known activity" whenever the sim clock is past the latest `ingested_at` known at that instant. At 18:20:00 this is already true (last event 18:19:43): the data package ends there (D-40).
 
 **D-73 Tests.** `apps/web/test/routes.test.ts` (19) calls the route handlers directly on a temp `data/live`: view at 18:20 equals the engine (top item, recommended physician, ledger), integrity 8/8 · 18/18 · 0 diffs, grid classes vs engine needs, memoization; events accept/duplicate/reject with line numbers; 403 role errors, NOT_OWN_OFFER, idempotent commandId, stale expectedSeq → 409, concurrent same-seq commands (one 200, one 409), malformed → 400; the closed loop through the routes with PHI and QR checks; clock jump → tick → `offer_expired`, late accept → 410 EXPIRED; restart replay and reset; SSE hello + clock message. `test/view.unit.test.ts` (6): chips, bucket geometry, markers, ids, play loop. Playwright (`apps/web/e2e`, chromium, against `next start`): the closed loop across three browser contexts (console, lead phone, physician phone), the live-inject re-rank within 2 s via SSE without reload, role gating, and `screens.spec.ts`, which writes `docs/screens/*.png`. E2E expectations come from the engine's golden fixtures.
+
+## Session 7: dataset swap, demo safety, AWS (DynamoDB, Bedrock, EC2) (2026-10-10)
+
+The engine is unchanged in behavior. On data/raw, all 303 Session 6 engine tests still pass, plus 10 new ingest tests, and `pnpm report:detect` / `report:decide` / `demo:loop` regenerate their docs byte-identical. AWS lives only in `apps/web/src/server/`, behind interfaces with local fallbacks; with no AWS at all the demo is identical (file store + template text).
+
+**D-74 Schema-adaptive ingestion (OQ-45).** `packages/engine/src/data/ingest.ts` is pure: texts in, `{dataset, report, texts}` out. `loaders.ingestDir(dir)` reads every `*.csv` plus an optional `mapping.json`.
+- **File kinds.** Each file's kind comes from its name, else from its headers: the kind whose columns resolve best, if at least 60 % resolve (`FILE_KIND_MIN_HEADER_SCORE`).
+- **Header matching** (`HEADER_ALIASES`, `HEADER_PREFIX_MIN_LENGTH`), in order: mapping override → exact → normalized (case and punctuation ignored: "Event time" = event_time) → alias (the brief's own table headers: "Phys.", "Hosp.", "Consult", …) → unique prefix of 3 or more characters.
+- **Credentialing.** Hospital columns match with or without the "SYN-" prefix (`hospital_suffix`; the brief says the matrix headers lack it).
+- **Fuzzy matches are suggestions only.** Edit-distance matches are never applied. A missing required column is reported with its closest headers.
+- **Report contents.** `IngestReport` lists, per file: kind and how it was detected, every mapping with its method, unmapped headers, missing columns with suggestions, and row errors with 1-based line numbers (50 per file, then a count). It also lists missing files, errors and warnings.
+- **Byte safety.** Only the header line is rewritten to canonical names before the existing loaders parse the text, so data bytes are untouched.
+
+**D-75 Storage interface.**
+- `src/server/repo/`:
+  - `ActionRepo {load, append(expectedSeq, events) → ok | conflict, clear}`.
+  - `EventRepo {load, append(rows), clear}`.
+  - `FileRepo` (default) writes `data/live/<datasetKey>/actions.jsonl` and `events.jsonl`. This supersedes the D-65 layout; `persist.ts` is gone.
+  - `DynamoRepo` is used with `STORE=dynamo`, `TABLE_NAME`, `AWS_REGION`.
+- `datasetKey` is content-addressed: `ds-` + 16 hex of sha256 over the package's CSVs and mapping.json. Each dataset therefore has its own log partition.
+- `withFallback` wraps DynamoDB. The first infrastructure error (no credentials, missing table, throttling, network) switches every repo to the file store for the rest of the process. The file store is seeded with an in-memory mirror of everything already written, so nothing is lost. `/api/health` reports `file (dynamo unavailable: <reason>)`. Conflicts are not failures and pass through.
+
+**D-76 Storage-level double-accept guarantee.**
+- **Table layout.** One table: `pk = "log#<datasetKey>"` or `"events#<datasetKey>"` (S), `sk = seq` (N), `body` = the JSON event. On-demand billing.
+- **Append.** `append` writes all new items in one `TransactWriteItems`. Every Put has `ConditionExpression: attribute_not_exists(sk)`.
+- **Race outcome.** When two servers race for the same seq, exactly one transaction commits. The other is cancelled with `ConditionalCheckFailed` and becomes `CONFLICT`. The store then reloads the log and re-applies the same command through the engine's `applyCommand` (new `expectedSeq`, up to 3 times). For a second "accept" the engine answers INVALID_STATE, because the offer is already accepted.
+- **The guarantee.** **Two physicians can never both accept the same offer, and one offer can never be accepted twice, even across servers.** The engine's state machine decides who wins; the database guarantees only one write per seq.
+- **Verified.** `apps/web/test/repo.test.ts` runs two `Store` instances on one mocked table, plus the conditional-failure path: exactly one `offer_accepted` is stored and `conflictsResolved` is 1.
+- **File store.** Within one process it gives the same guarantee (mutex + head-seq check), but not across hosts.
+
+**D-77 Dataset swap.**
+- **Upload.** `/admin/dataset` and `POST /api/dataset` accept multipart CSVs or a .zip (fflate). The upload is staged in `data/live/uploads/<stageId>/`.
+- **Report.** The response carries the ingest report and, when snapshot files are present, `diffSnapshot` as "x/8 physicians, y/18 consults" plus up to 200 cell diffs.
+- **Mapping overrides.** `POST /api/dataset/mapping` writes `mapping.json` into the stage and re-ingests. The UI offers a select per missing column, preselected with the closest suggestion.
+- **Activate** (`POST /api/dataset/activate`, lead PIN) swaps atomically under the store mutex:
+  - `datasetVersion` + 1;
+  - the new dataset's action log and injected events start empty;
+  - clock = its snapshot's as-of time, else its last event time, paused;
+  - the previous dataset is kept for one-click **Revert** (`POST /api/dataset/revert`, also fresh);
+  - the active choice persists in `data/live/active-dataset.json`.
+- **Snapshot mismatch.** Activation is still allowed. The console shows a red banner, "Replay differs from your snapshot: N cells", linking to `/integrity`.
+
+**D-78 Offer link tokens and the lead PIN (OQ-44 update).**
+- **Offer links.** Physician links are `/offer/<id>?t=<token>`, where token = first 22 chars of base64url(HMAC-SHA256(secret, "offer:" + id)).
+  - The QR encodes the tokenized URL.
+  - The phone page and `GET /api/offers/:id` require it.
+  - The `respond` command requires it in `x-lookahead-offer-token` or `body.token` (403 BAD_TOKEN otherwise).
+- **Lead PIN.** Clinical-lead commands and dataset activate/revert need the lead PIN (`LEAD_PIN`, default "2026").
+  - `POST /api/auth/lead {pin}` sets an HttpOnly, SameSite=Lax cookie `lh_lead` for 12 h.
+  - The cookie holds HMAC(secret, "lead:" + PIN), never the PIN.
+  - Without the cookie the API answers 401 PIN_REQUIRED.
+  - The console's role switch to Clinical lead asks for the PIN.
+- **Secret.** `OFFER_LINK_SECRET`, else a random secret generated once into `data/live/.secret`.
+- **Comparisons** are constant-time.
+- **Still open.** Coordinator actions, inject and reset remain open, as OQ-44 says (demo-grade).
+
+**D-79 Quiet-feed banner (OQ-46), supersedes D-72.** "No new Sevaro events since HH:MM:SS" appears only when `now − lastIngestedAt > QUIET_FEED_BANNER_MS` (120 000). At 18:20:00 the last event is 17 s old, so the console no longer opens with a stale-feed warning.
+
+**D-80 Next candidate and escalation suggested.** After a decline, an expiry or a rejection, `ViewDTO.nextOffer` calls the engine's `recommendNext` (OQ-43). With nobody left, ACT step 3 reads "<name>'s offer was declined/expired/rejected … **Escalation suggested**", and step 2 (Raise escalation) is highlighted. At 18:20 only Dr. Grace Okafor is eligible, so all three paths end in "escalation suggested" (e2e). The inject page also accepts a CSV by file picker or drag-and-drop (it fills the textarea for review; nothing is sent until Submit).
+
+**D-81 Narration (Bedrock) with a fidelity guard.** LLMs stay out of the decision path. `POST /api/narrate {kind: attention | recommendation | lead_briefing, id}` → `{text, source: bedrock | template, checks, modelId, fallbackReason}`.
+- **Input.** Only compact engine facts for that item (`narrate/facts.ts`), de-identified before the model sees them:
+  - no consult or event ids;
+  - physician and hospital ids replaced by names;
+  - "Stroke" → "time-critical", imaging → "workup";
+  - OQ and brief citations stripped.
+- **System prompt.** Only these facts, no clinical advice, no patient details, no ids, 2–3 sentences ≤ 60 words, times exactly as given (24-h ET), and do not tell the reader what to decide.
+- **Model call.** Claude via Bedrock **Converse** (`@aws-sdk/client-bedrock-runtime`), 4 s timeout, maxTokens 1024, no sampling parameters.
+  - The model is discovered with `ListInferenceProfiles`: Claude Haiku first, then Sonnet, the region's geo prefix first, newest id first. `BEDROCK_MODEL_ID` overrides.
+  - For Claude 5.x ids the call adds `output_config.effort = low`. A model that rejects it is retried without it, and that is remembered.
+  - The user's spec chose Converse + a Haiku inference profile in the event's AWS account, so we use that instead of the Anthropic SDK default. Narration needs latency, not depth.
+- **Fidelity guard** (`narrate/guard.ts`). Each check names what failed:
+  - (a) `phi`: the engine's PHI denylist (`findPhiViolations`) plus CON/EVT ids;
+  - (b) `numbers`: every number and clock time in the text must appear in the facts. Times are normalized, so "6:35 PM" = 18:35; spelled numbers count;
+  - (c) `names`: every id-like or capitalized proper-noun token must be in the facts' names or words;
+  - (d) `length`: ≤ 60 words.
+- **Fallback.** Any failure, timeout, credential error or unavailability serves the deterministic **template**: the title plus whole fact sentences up to 60 words, which passes its own guard for all 22 attention items and the recommendation at 18:20.
+- **Cache.** Results are cached by (dataset key, dataset version, kind, id, facts hash). Only Bedrock successes and guard failures are cached; outages are retried.
+- **UI.**
+  - "Explain" sits on attention cards and on the recommendation.
+  - `/lead` shows the briefing above Approve (auto).
+  - The badge reads "AI-WRITTEN · VERIFIED" or "TEMPLATE"; hovering lists the checks.
+
+**D-82 Health, deploy, audit archive.**
+- **Health.** `GET /api/health` returns `{ok, store, bedrock, bedrockModel, bedrockReason, dataset, datasetVersion, version, clock, logSeq, conflictsResolved, bootWarnings, publicOrigin}`.
+- **Deploy.** `scripts/aws/` holds:
+  - `create-table.ts` (`pnpm aws:create-table`, on-demand, idempotent, checks the key schema);
+  - `iam-policy.json`: DynamoDB PutItem/Query/DeleteItem/ConditionCheckItem on the table, `bedrock:InvokeModel` on the chosen profile and its foundation model, `bedrock:ListInferenceProfiles`, `s3:PutObject` on `lookahead/*` and `s3:GetObject` on `code/*` of one bucket. TransactWriteItems and Converse have no IAM actions of their own: they are authorized as PutItem and InvokeModel;
+  - `ec2-trust-policy.json`;
+  - `user-data.sh`: Amazon Linux 2023; Node 20 from nodejs.org with its SHA-256 verified; pnpm 10.28.0; 2 GB swap on small instances; code from S3, a presigned URL, git or a local tarball; `pnpm install --frozen-lockfile && pnpm --filter web build`; systemd `next start -p 80` as a non-root user with `CAP_NET_BIND_SERVICE`; env in `/etc/lookahead.env`; `LOOKAHEAD_PUBLIC_ORIGIN` from IMDSv2; the offer-link secret generated on the instance and kept across redeploys; releases kept for rollback;
+  - `deploy-ec2.md`: CloudShell commands with expected output and fallbacks.
+- **Credentials.** They come only from the instance profile.
+- **Audit archive.** With `AUDIT_BUCKET` set, a reset or dataset swap first copies the audit CSV and the action log to S3 (best effort).
+- **Remote e2e.** `PLAYWRIGHT_BASE_URL=… pnpm --filter web e2e:remote` runs the `@demo` e2e tests against a deployed server.
+
+**D-83 Tests (Session 7).**
+- **Engine:** `test/ingest.test.ts` (10).
+- **Web vitest** (55 in total):
+  - `routes.test.ts` (22): tokens, PIN, quiet banner, decline → escalation suggested;
+  - `repo.test.ts` (6): DynamoRepo with `aws-sdk-client-mock` (per-item condition, ConditionalCheckFailed → conflict, infrastructure errors propagate, clear), the fallback to the file repo, the two-server race. FileRepo is covered unchanged by the Session 6 route tests (restart replay, reset);
+  - `dataset.test.ts` (7): original files → 8/8 & 18/18; renamed headers "Event time"/"Phys." ingest; a missing required column → error with suggestion → override re-ingests; a .zip upload; nothing usable → 400; activation needs the PIN; activate → /api/view reflects it; mismatch reported; revert; the active dataset survives a restart;
+  - `narrate.test.ts` (14): the guard rejects a hallucinated number, a CON id, "stroke" and an unknown name; mocked Bedrock success; template on timeout and on credential error; profile ranking.
+- **Playwright** (11): closed loop with PIN + tokenized link, live inject, role gating with PIN, token refusal, decline / reject / expiry → escalation suggested, Explain, dataset swap (renamed headers, activate, revert), mismatch banner, screenshots (now incl. the PIN screen, Explain and the dataset report).

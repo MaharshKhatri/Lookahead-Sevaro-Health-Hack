@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: 3.1149.0
+        version: 3.1149.0
       '@eslint/js':
         specifier: ^9.39.5
         version: 9.39.5

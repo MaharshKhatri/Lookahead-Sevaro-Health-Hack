@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "e2e": "next build && playwright test",
-    "screens": "next build && playwright test e2e/screens.spec.ts"
+    "screens": "next build && playwright test e2e/screens.spec.ts",
+    "e2e:remote": "playwright test --grep @demo"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock": "3.1149.0",

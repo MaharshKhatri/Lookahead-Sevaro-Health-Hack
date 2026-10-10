@@ -381,5 +381,26 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 ### OQ-44 Who is acting, in the demo
 - **Brief:** "Any message to a physician outside their shift requires a human approval in the demo"; the off-shift physician can "Accept or decline from a phone; nothing else". Real scheduling and messaging systems are out of scope; the brief says nothing about authentication.
 - **Default (apps/web, D-66):** no login. The client names its role in `x-lookahead-role` (coordinator, clinical_lead, physician) and its id in `x-lookahead-actor-id`; the engine's `COMMAND_ROLES` decides what that role may do, and `respond` succeeds only when the actor id is the offer's physician (NOT_OWN_OFFER otherwise). The phone view `/offer/[id]` acts as the offer's physician. `system` is reserved for the server (clock ticks).
-- **Consequence:** anyone who can reach the server can act as any role. Acceptable for a synthetic-data demo; a deployment needs real identity (SSO for staff, signed one-time links for physicians).
-- **Verify:** `apps/web/test/routes.test.ts` (role errors, NOT_OWN_OFFER).
+- **Consequence (Session 6):** anyone who can reach the server can act as any role. Acceptable for a synthetic-data demo; a deployment needs real identity (SSO for staff, signed one-time links for physicians).
+- **Session 7 update (D-78):** two demo-grade locks for a server on a public URL.
+  - **Offer link tokens.** A physician's link is `/offer/<id>?t=<token>`, with token = HMAC-SHA256(server secret, offer id), 22 chars base64url. The QR encodes it. The phone page, `GET /api/offers/:id` and the `respond` command refuse a missing or wrong token (403 BAD_TOKEN). The secret is `OFFER_LINK_SECRET`, else generated once into `data/live/.secret`.
+  - **Lead PIN.** Clinical-lead commands (approve, reject, authorize escalation) and dataset activate/revert need a shared PIN: `LEAD_PIN`, default **2026**. It is entered once on `/lead` (or in the console's role switch) and kept for 12 h in an HttpOnly cookie that holds an HMAC, not the PIN. Without it the API answers 401 PIN_REQUIRED.
+  - **Still open:** coordinator commands, event injection, clock and reset (demo controls).
+- **Verify:** `apps/web/test/routes.test.ts` (role errors, NOT_OWN_OFFER, PIN, tokens); e2e `loop.spec.ts` (role gating with PIN, token refusal).
+
+### OQ-45 Matching a data package laid out differently
+- **Brief:** the live test ("What Teams Must Demonstrate" #8) adds events "in the same format" and says "Your system must update without a restart". It does not ask for a whole replacement package, and it does not say how a differently laid-out one should be read. Swapping the dataset on `/admin/dataset` is our extension, so judges can run Lookahead on data we have not seen. The brief prints its tables with display headers ("Event time", "Phys.", "Hosp.", "Consult") and says "Column headers are hospital IDs without the SYN- prefix" for the credentialing matrix.
+- **Default (D-74):** a header matches, in order, by:
+  1. an explicit `mapping.json` override;
+  2. exact name;
+  3. normalized equality (case and punctuation ignored);
+  4. the brief's own display headers (`HEADER_ALIASES`);
+  5. a unique prefix of at least `HEADER_PREFIX_MIN_LENGTH` (3) characters.
+
+  A file whose name is not recognised is assigned to the kind its headers fit best if at least `FILE_KIND_MIN_HEADER_SCORE` (60 %) of that kind's columns resolve. Edit-distance matches are only ever *suggestions* shown next to a missing column; nothing is guessed silently. Every match is reported with its method, and row errors carry line numbers.
+- **Verify:** `packages/engine/test/ingest.test.ts`, `apps/web/test/dataset.test.ts`, e2e `dataset.spec.ts`.
+
+### OQ-46 When the feed counts as quiet
+- **Brief:** silent. It covers late events ("Events can arrive late. Every event carries both event_time and ingested_at"), not a feed that goes quiet. Gaps of tens of seconds between events are normal in the package.
+- **Default:** the console's "No new Sevaro events since HH:MM:SS" banner appears only when the sim clock is more than `QUIET_FEED_BANNER_MS` (120 000 ms, 2 min) past the last ingested event. This supersedes the Session 6 rule (any gap). At 18:20:00 the last event is 17 s old: no banner. After **Jump 19:00**: banner.
+- **Verify:** `apps/web/test/routes.test.ts` ("OQ-46: the quiet-feed banner …").

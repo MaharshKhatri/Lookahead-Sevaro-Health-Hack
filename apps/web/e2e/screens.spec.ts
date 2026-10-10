@@ -1,12 +1,13 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { device } from './fixtures';
+import { LEAD_PIN, device, offerLink } from './fixtures';
 
 /**
  * Design review screenshots into docs/screens/ (Session 6): every page at
  * 1920x1080, the phone flows at 390x844. Walks the real demo path so each
- * shot shows live engine output.
+ * shot shows live engine output. Session 7 adds the lead PIN, the Explain
+ * briefing and the dataset admin page.
  */
 const OUT = fileURLToPath(new URL('../../../docs/screens/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
@@ -25,6 +26,9 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await page.goto('/');
   await expect(page.getByTestId('attention-top')).toBeVisible();
   await shot(page, '01-command-center');
+  await page.getByTestId('attention-top').getByTestId('explain-attention').click();
+  await expect(page.getByTestId('narration-attention')).toBeVisible();
+  await shot(page, '01b-command-center-explain');
   await page.getByTestId('tab-trap').click();
   await shot(page, '02-command-center-trap');
   await page.getByTestId('tab-whatif').click();
@@ -38,7 +42,12 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   const phoneCtx = await browser.newContext(device(baseURL, PHONE, true));
   const phone = await phoneCtx.newPage();
   await phone.goto('/lead');
+  await expect(phone.getByTestId('lead-pin')).toBeVisible();
+  await shot(phone, '04a-lead-pin-390');
+  await phone.getByTestId('lead-pin').fill(LEAD_PIN);
+  await phone.getByTestId('lead-pin-submit').click();
   await expect(phone.getByTestId('lead-offer')).toBeVisible();
+  await expect(phone.getByTestId('narration-lead_briefing')).toBeVisible();
   await shot(phone, '04-lead-inbox-390');
   await shot(phone, '04b-lead-inbox-390-full', true);
   await phone.getByTestId('lead-approve').click();
@@ -47,7 +56,7 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await expect(card.getByTestId('offer-status')).toHaveText('DELIVERED');
   await shot(page, '05-command-center-offer-delivered');
 
-  await phone.goto(`/offer/${offerId}`);
+  await phone.goto(await offerLink(card));
   await expect(phone.getByTestId('phone-countdown')).toBeVisible();
   await shot(phone, '06-offer-phone-390');
   await phone.getByTestId('offer-accept').click();
@@ -81,5 +90,19 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await page.goto('/');
   await expect(page.getByTestId('attention-top')).toBeVisible();
   await shot(page, '14-command-center-after-inject');
+
+  // Dataset admin: a package with the brief's own headers ("Event time", "Phys."), not activated.
+  const RAW = new URL('../../../data/raw/', import.meta.url);
+  const upload = readdirSync(RAW)
+    .filter((n) => n.endsWith('.csv'))
+    .map((name) => {
+      const text = readFileSync(new URL(name, RAW), 'utf8');
+      const renamed = name === 'event_stream.csv' ? 'Event,Event time,Ingested,Consult,Type,Phys.,Hosp.,Description' + text.slice(text.search(/\r?\n/)) : text;
+      return { name, mimeType: 'text/csv', buffer: Buffer.from(renamed) };
+    });
+  await page.goto('/admin/dataset');
+  await page.getByTestId('dataset-files').setInputFiles(upload);
+  await expect(page.getByTestId('snapshot-check')).toBeVisible();
+  await shot(page, '15-admin-dataset-report');
   await phoneCtx.close();
 });

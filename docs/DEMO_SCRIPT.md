@@ -11,8 +11,8 @@ LOOKAHEAD_PUBLIC_ORIGIN=http://<laptop-LAN-IP>:3000 pnpm --filter web start   # 
 ```
 
 - Projector: `http://localhost:3000/` at 1920×1080, role **Coordinator**.
-- Phone A (clinical lead): `http://<laptop-LAN-IP>:3000/lead`.
-- Phone B (off-shift physician): scans the QR that appears after approval.
+- Phone A (clinical lead): `http://<laptop-LAN-IP>:3000/lead`, enter the lead PIN **2026** once (kept 12 h).
+- Phone B (off-shift physician): scans the QR that appears after approval (the link carries a signed token; without it the page refuses).
 - Click **Reset 18:20** in the top bar. The clock is **paused, 1×** for the whole demo; nothing moves unless you move it.
 
 ## Click path
@@ -27,14 +27,18 @@ LOOKAHEAD_PUBLIC_ORIGIN=http://<laptop-LAN-IP>:3000 pnpm --filter web start   # 
 | 1:50 | 18:20 | **TRAP** tab | Before: 0 consults, first pick at 4 hospitals incl. Meadowlands. After SCOPE + SEED: Meadowlands crossed out, seed = median(10, 12, 14, 14, 15, 15) = 14, first pick only at Suncrest. |
 | 2:05 | 18:20 | **WHAT-IF** tab | Oak Valley deadlock 100 → 15 min; Northfield HARD GAP downgraded; Suncrest 19:00 AT RISK closed. |
 | 2:15 | 18:20 | **Propose offer** | Toast; OFFERS tab shows **PROPOSED**. |
-| 2:25 | 18:20 | Phone A: **Approve** | The lead sees the rationale in plain words and the exact message. Projector: **DELIVERED**, expiry countdown 10:00, QR. |
+| 2:25 | 18:20 | Phone A: **Approve** | The lead sees the rationale, a 3-sentence **Briefing** (badge: AI-written · verified, or template), and the exact message. Projector: **DELIVERED**, expiry countdown 10:00, QR. |
 | 2:45 | 18:20 | Phone B: scan QR, **Accept** | The phone shows only hospitals, hours, start time, generic reason. Projector (no reload): **ACCEPTED**; Suncrest/Oak deadlock cells now end at 18:35; WHAT-IF shows the effect recorded at acceptance. |
 | 3:10 | 18:20 | OFFERS → **Audit trail** | 6 considered, each exclusion with numbers, who approved, outcome, CSV. |
 | 3:25 | 18:20 → 18:21:47 | **Inject** → **Insert sample** → **Submit rows** (advance on) | Live test: a new stroke consult at Suncrest. Back on **Command**: CON-2119 appears as a routing deadlock near the top (measured ~0.5 s via SSE), spike now 6/hr. Judges can paste their own rows here instead. |
 | 3:45 | 19:00 | **Jump 19:00** (optional) | PHY-003 and PHY-006 drop off; the grid and attention list re-project. Close. |
 
+Optional, if asked about AI: on the #1 card click **Explain**. Claude on Bedrock writes the briefing from engine facts only. Every number, time and name is checked against those facts, and on any mismatch the template text is shown instead. The badge says which one you see.
+
+Optional, if asked "does it work on our data?": **Dataset** in the top bar. Drop the judge's CSVs or a .zip and read the ingest report (header matches, missing columns with suggestions, snapshot check). Click **Activate** (PIN), then **Revert** afterwards.
+
 ## If something goes wrong
 
-- Anything odd: **Reset 18:20** clears injected rows and the action log.
+- Anything odd: **Reset 18:20** clears injected rows and the action log. Full judging-day runbook (EC2, Wi-Fi fallback, reset between groups): `docs/RUNBOOK.md`.
 - Phones cannot open the QR link: the server was started without `LOOKAHEAD_PUBLIC_ORIGIN`, or the phones are on another network. Type the URL shown under the QR.
 - A command is refused: the toast shows the engine's reason in plain English (for example, the clock was moved back before the last action; move it forward).

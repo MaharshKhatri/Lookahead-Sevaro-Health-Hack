@@ -13,3 +13,23 @@ export const device = (baseURL: string | undefined, viewport: { width: number; h
   viewport,
   ...(mobile ? { isMobile: true, hasTouch: true } : {}),
 });
+
+/** The clinical lead's PIN (OQ-44): the local server runs with LEAD_PIN=2026; remote runs pass E2E_LEAD_PIN. */
+export const LEAD_PIN = process.env.E2E_LEAD_PIN ?? '2026';
+
+type Page = import('@playwright/test').Page;
+
+/** /lead on a phone-sized page: enter the PIN (the cookie then holds a MAC, not the PIN). */
+export async function openLead(lead: Page): Promise<void> {
+  await lead.goto('/lead');
+  await lead.getByTestId('lead-pin').fill(LEAD_PIN);
+  await lead.getByTestId('lead-pin-submit').click();
+  await lead.getByTestId('lead-pin').waitFor({ state: 'detached' });
+}
+
+/** The tokenized physician link shown under the QR (OQ-44: /offer/<id>?t=<HMAC>). */
+export async function offerLink(card: import('@playwright/test').Locator): Promise<string> {
+  const url = (await card.getByTestId('offer-url').textContent()) ?? '';
+  const u = new URL(url);
+  return `${u.pathname}${u.search}`;
+}

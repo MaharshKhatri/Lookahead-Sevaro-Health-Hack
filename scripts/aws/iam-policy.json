@@ -1,0 +1,38 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LookaheadActionLog",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:Query", "dynamodb:DeleteItem", "dynamodb:ConditionCheckItem"],
+      "Resource": "arn:aws:dynamodb:REGION:ACCOUNT_ID:table/TABLE_NAME"
+    },
+    {
+      "Sid": "LookaheadNarrationInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:REGION:ACCOUNT_ID:inference-profile/PROFILE_ID",
+        "arn:aws:bedrock:*::foundation-model/MODEL_ID"
+      ]
+    },
+    {
+      "Sid": "LookaheadNarrationDiscovery",
+      "Effect": "Allow",
+      "Action": ["bedrock:ListInferenceProfiles"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LookaheadAuditArchive",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": "arn:aws:s3:::BUCKET/lookahead/*"
+    },
+    {
+      "Sid": "LookaheadCodeDownload",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::BUCKET/code/*"
+    }
+  ]
+}

@@ -19,6 +19,18 @@ import { Button, Chip, Panel, cx } from './ui';
 
 const METHOD_TONE = { exact: 'ok', override: 'accent', normalized: 'info', alias: 'info', prefix: 'warning', hospital_suffix: 'info' } as const;
 
+const KIND_LABEL: Readonly<Record<string, string>> = {
+  events: 'event stream',
+  hospitals: 'hospitals',
+  physiciansOnShift: 'on-shift roster',
+  offShiftRoster: 'off-shift roster',
+  credentials: 'credentialing',
+  baselineHourly: 'baseline volume',
+  coverageRequirements: 'coverage rules',
+  snapshotPhysicians: 'snapshot physicians',
+  snapshotConsults: 'snapshot consults',
+};
+
 function FileCard({ f, choice, setChoice }: { readonly f: IngestFileReport; readonly choice: Record<string, string>; readonly setChoice: (column: string, header: string) => void }) {
   const bad = f.missing.length > 0 || f.rowErrors.length > 0;
   return (
@@ -26,7 +38,7 @@ function FileCard({ f, choice, setChoice }: { readonly f: IngestFileReport; read
       <div className="flex flex-wrap items-center gap-2">
         <span className="num text-[14px] font-semibold">{f.source}</span>
         <span className="text-muted">→</span>
-        {f.kind === null ? <Chip tone="muted">IGNORED</Chip> : <Chip tone={bad ? 'critical' : 'ok'}>{f.kind}</Chip>}
+        {f.kind === null ? <Chip tone="muted">IGNORED</Chip> : <Chip tone={bad ? 'critical' : 'ok'}>{KIND_LABEL[f.kind] ?? f.kind}</Chip>}
         {f.detectedBy !== null && <span className="text-[12px] text-muted">by {f.detectedBy}</span>}
         {f.canonicalName !== null && f.canonicalName !== f.source && <span className="num text-[12px] text-muted">as {f.canonicalName}</span>}
         <span className="num ml-auto text-[12px] text-muted">{f.rows} rows</span>
@@ -158,7 +170,7 @@ function Report({ stage, onRemap, onActivate, busy }: { readonly stage: StageRes
       </div>
       {r.warnings.length > 0 && (
         <details className="text-[12px] text-muted">
-          <summary className="cursor-pointer">{r.warnings.length} data warnings (non-fatal)</summary>
+          <summary className="cursor-pointer">{r.warnings.length} data warning{r.warnings.length === 1 ? '' : 's'} (non-fatal)</summary>
           <ul className="mt-1 space-y-0.5">
             {r.warnings.slice(0, 100).map((w) => (
               <li key={w}>{w}</li>

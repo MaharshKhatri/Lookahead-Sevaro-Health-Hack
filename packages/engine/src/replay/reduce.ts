@@ -103,6 +103,7 @@ function newPhysician(physicianId: string, name: string | null, onRoster: boolea
     onRoster,
     shift,
     shiftStartedMs: null,
+    shiftStartedBy: null,
     status: { value: null, sinceMs: null, because: [] },
     agent: { online: true, sinceMs: null, because: [] },
     camera: { active: false, sinceMs: null, because: [] },
@@ -110,6 +111,7 @@ function newPhysician(physicianId: string, name: string | null, onRoster: boolea
     activeVideo: null,
     ringing: null,
     lastCallEndedMs: null,
+    lastCallEndedBy: null,
     lastVideoEndedMs: null,
     consultsThisShift: 0,
     callsThisShift: 0,
@@ -337,6 +339,7 @@ function onCallEnded(ctx: ReplayContext, e: RawEvent, t: EpochMs, direction: 'in
   if (i < 0) ctx.warnings.push(`${e.eventId}: ${e.eventType} without a matching ${direction} call for ${p.physicianId}`);
   else p.activeCalls.splice(i, 1);
   p.lastCallEndedMs = t;
+  p.lastCallEndedBy = eventRef(e);
   p.ringing = null;
   const c = e.consultId === null ? null : consultFor(ctx, e);
   if (c !== null) {
@@ -423,6 +426,7 @@ function onShiftStarted(ctx: ReplayContext, e: RawEvent, t: EpochMs): boolean {
   const p = physicianFor(ctx, e);
   if (p === null) return false;
   p.shiftStartedMs = t;
+  p.shiftStartedBy = eventRef(e);
   if (SHIFT_COUNTERS_RESET_ON_SHIFT_STARTED) {
     p.consultsThisShift = 0;
     p.callsThisShift = 0;

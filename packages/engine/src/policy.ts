@@ -128,3 +128,74 @@ export const PENDING_FIRST_CONTACT_COUNTS_AS_RINGING = true;
  */
 export const STAGE_REENTRY_KEEPS_ENTRY_TIME = true;
 export const STAGE_REGRESSION = 'apply_with_warning' as const;
+
+/** OQ-26: inside routing rule 3's low-volume tier, order like rule 4 (fewest consults, then least recently answered, never-answered first), then physician id. */
+export const LOW_VOLUME_TIER_ORDER = 'fewest_consults_then_least_recent_answer' as const;
+
+/**
+ * OQ-27: off-shift roster physicians with a next_shift_start are on shift from
+ * then for this many hours (the roster gives no end). They count in staffed
+ * capacity (brief roster note: "A scheduled night shift is not a split-shift
+ * offer") and satisfy routing rule 1 from their start, unverified until they
+ * produce presence signals.
+ */
+export const SCHEDULED_SHIFT_HOURS = 12;
+export const SCHEDULED_ARRIVALS_COUNT_AS_ON_SHIFT = true;
+
+/** OQ-28: in a projection, each physician's current self-reported status (e.g. Temporarily Unavailable) persists. */
+export const PROJECTION_HOLDS_CURRENT_STATUS = true;
+
+/** OQ-03 addendum: baseline rows used on Monday-Friday ET; on other days there is no baseline and no spike is evaluated. */
+export const BASELINE_WEEKDAY_DOW_TYPE = 'weekday';
+
+/** Coverage projection horizon and grid (brief "What Teams Must Demonstrate" #4: "at least 90 minutes"). */
+export const PROJECTION_HORIZON_MIN = 120;
+export const PROJECTION_STEP_MIN = 5;
+
+/** Attention list: a standard that crosses its next threshold within this window is IMMINENT_BREACH. */
+export const IMMINENT_WINDOW_MIN = 15;
+
+/**
+ * Attention ranking weights (brief: "Detect and rank what needs attention, and
+ * explain why each item was flagged"). score = sum of the factors below; the UI
+ * shows the per-item breakdown. Ties break by item id.
+ */
+export const ATTENTION_WEIGHTS = {
+  kind: {
+    ROUTING_DEADLOCK: 60,
+    STANDARD_BREACH: 40,
+    COVERAGE_GAP: 35,
+    IMMINENT_BREACH: 20,
+    OPEN_NOTES_NEAR_SHIFT_END: 20,
+    DEMAND_SPIKE: 15,
+    SIGNAL_CONFLICT: 10,
+  },
+  /** Level of the breach or deadlock now (a deadlock is always critical; imminent items use the level they will reach). */
+  level: { critical: 30, warning: 10 },
+  strokeAtRisk: 25,
+  /** Full points when impact is now, falling linearly to 0 at PROJECTION_HORIZON_MIN. */
+  urgencyMax: 20,
+  /** Per minute past the threshold already crossed, capped. */
+  overduePerMinute: 0.5,
+  overdueCap: 15,
+  /** A warning breach that turns critical within IMMINENT_WINDOW_MIN. */
+  escalatesSoon: 8,
+  shortfallPerPhysician: 10,
+  spikeExcessPerConsult: 5,
+  spikeExcessCap: 20,
+  openNotePerNote: 5,
+  signal: {
+    EXTERNAL_VIDEO_SUSPECTED: 15,
+    AGENT_OFFLINE_UNVERIFIED: 10,
+    TEMP_UNAVAILABLE_WITH_ASSIGNED: 20,
+    RINGING_UNANSWERED: 15,
+  },
+} as const;
+
+/** Severity from score (lower bounds, checked in order). */
+export const ATTENTION_SEVERITY_BANDS = [
+  { severity: 'critical', minScore: 110 },
+  { severity: 'high', minScore: 80 },
+  { severity: 'medium', minScore: 50 },
+  { severity: 'low', minScore: Number.NEGATIVE_INFINITY },
+] as const;

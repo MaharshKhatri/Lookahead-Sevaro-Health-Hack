@@ -60,6 +60,8 @@ export interface PhysicianState {
   /** From physicians_on_shift.csv (ET wall-clock on the scenario date, OQ-13); null if not on the roster. */
   readonly shift: { readonly startMs: EpochMs; readonly endMs: EpochMs } | null;
   readonly shiftStartedMs: EpochMs | null;
+  /** The shift_started event behind shiftStartedMs (provenance for shift-end reasoning). */
+  readonly shiftStartedBy: EventRef | null;
   readonly selfStatus: Provenanced<SelfReportedStatus | null>;
   readonly agent: { readonly online: boolean; readonly sinceMs: EpochMs | null; readonly because: readonly EventRef[] };
   /** active is null while the agent is offline (brief: "offline means camera state is unknown"). */
@@ -68,6 +70,8 @@ export interface PhysicianState {
   readonly activeVideo: ActiveVideo | null;
   readonly ringing: Ringing | null;
   readonly lastCallEndedMs: EpochMs | null;
+  /** The call-end event behind lastCallEndedMs (routing rule 2 cooldown provenance). */
+  readonly lastCallEndedBy: EventRef | null;
   readonly lastVideoEndedMs: EpochMs | null;
   readonly consultsThisShift: number;
   readonly callsThisShift: number;

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "att-09103628",
+    "kind": "ROUTING_DEADLOCK",
+    "severity": "critical",
+    "score": 135,
+    "headline": "CON-2105 Stroke at Oak Valley Medical: no routable physician"
+  },
+  {
+    "id": "att-8c0d32ca",
+    "kind": "ROUTING_DEADLOCK",
+    "severity": "critical",
+    "score": 135,
+    "headline": "CON-2114 Stroke at Suncrest Medical Pavilion: no routable physician"
+  },
+  {
+    "id": "att-f918d57a",
+    "kind": "STANDARD_BREACH",
+    "severity": "critical",
+    "score": 118,
+    "headline": "CON-2102 Stroke: imaging pending CRITICAL, 26 min at Lakeview Hospital"
+  },
+  {
+    "id": "att-94cdc279",
+    "kind": "STANDARD_BREACH",
+    "severity": "critical",
+    "score": 117.4,
+    "headline": "CON-2110 Stroke: assigned, not contacted CRITICAL, 12.8 min at Harbor Regional"
+  },
+  {
+    "id": "att-74f65a04",
+    "kind": "STANDARD_BREACH",
+    "severity": "critical",
+    "score": 116.6,
+    "headline": "CON-2112 Stroke: imaging review CRITICAL, 15.2 min at Suncrest Medical Pavilion"
+  }
+]

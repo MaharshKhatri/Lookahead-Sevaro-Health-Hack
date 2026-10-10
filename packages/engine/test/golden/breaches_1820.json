@@ -1,0 +1,132 @@
+[
+  {
+    "consultId": "CON-2102",
+    "consultType": "Stroke",
+    "standard": "IMAGING_PENDING",
+    "level": "critical",
+    "clockStart": "17:54:00",
+    "elapsedMin": 26,
+    "warnAt": "18:06:00",
+    "criticalAt": "18:14:00"
+  },
+  {
+    "consultId": "CON-2103",
+    "consultType": "General Neuro",
+    "standard": "NOTE_COMPLETION",
+    "level": "ok",
+    "clockStart": "17:46:00",
+    "elapsedMin": 34,
+    "warnAt": "18:31:00",
+    "criticalAt": "19:16:00"
+  },
+  {
+    "consultId": "CON-2105",
+    "consultType": "Stroke",
+    "standard": "TRIAGED_NOT_ASSIGNED",
+    "level": "critical",
+    "clockStart": "18:09:05",
+    "elapsedMin": 10.92,
+    "warnAt": "18:14:05",
+    "criticalAt": "18:19:05"
+  },
+  {
+    "consultId": "CON-2108",
+    "consultType": "Stroke",
+    "standard": "NOTE_COMPLETION",
+    "level": "ok",
+    "clockStart": "18:03:40",
+    "elapsedMin": 16.33,
+    "warnAt": "18:33:40",
+    "criticalAt": "18:48:40"
+  },
+  {
+    "consultId": "CON-2110",
+    "consultType": "Stroke",
+    "standard": "ASSIGNED_NOT_CONTACTED",
+    "level": "critical",
+    "clockStart": "18:07:15",
+    "elapsedMin": 12.75,
+    "warnAt": "18:10:15",
+    "criticalAt": "18:15:15"
+  },
+  {
+    "consultId": "CON-2111",
+    "consultType": "Stroke",
+    "standard": "NOTE_COMPLETION",
+    "level": "warning",
+    "clockStart": "17:45:50",
+    "elapsedMin": 34.17,
+    "warnAt": "18:15:50",
+    "criticalAt": "18:30:50"
+  },
+  {
+    "consultId": "CON-2112",
+    "consultType": "Stroke",
+    "standard": "IMAGING_REVIEW",
+    "level": "critical",
+    "clockStart": "18:04:50",
+    "elapsedMin": 15.17,
+    "warnAt": "18:10:50",
+    "criticalAt": "18:16:50"
+  },
+  {
+    "consultId": "CON-2113",
+    "consultType": "Stroke",
+    "standard": "NOTE_COMPLETION",
+    "level": "ok",
+    "clockStart": "18:11:50",
+    "elapsedMin": 8.17,
+    "warnAt": "18:41:50",
+    "criticalAt": "18:56:50"
+  },
+  {
+    "consultId": "CON-2114",
+    "consultType": "Stroke",
+    "standard": "TRIAGED_NOT_ASSIGNED",
+    "level": "ok",
+    "clockStart": "18:17:10",
+    "elapsedMin": 2.83,
+    "warnAt": "18:22:10",
+    "criticalAt": "18:27:10"
+  },
+  {
+    "consultId": "CON-2115",
+    "consultType": "General Neuro",
+    "standard": "NOTE_COMPLETION",
+    "level": "warning",
+    "clockStart": "17:30:00",
+    "elapsedMin": 50,
+    "warnAt": "18:15:00",
+    "criticalAt": "19:00:00"
+  },
+  {
+    "consultId": "CON-2116",
+    "consultType": "General Neuro",
+    "standard": "NOTE_COMPLETION",
+    "level": "ok",
+    "clockStart": "17:58:00",
+    "elapsedMin": 22,
+    "warnAt": "18:43:00",
+    "criticalAt": "19:28:00"
+  },
+  {
+    "consultId": "CON-2117",
+    "consultType": "General Neuro",
+    "standard": "NOTE_COMPLETION",
+    "level": "ok",
+    "clockStart": "17:40:30",
+    "elapsedMin": 39.5,
+    "warnAt": "18:25:30",
+    "criticalAt": "19:10:30"
+  },
+  {
+    "consultId": "CON-2118",
+    "consultType": "General Neuro",
+    "standard": "NOTE_COMPLETION",
+    "level": "warning",
+    "clockStart": "17:35:00",
+    "elapsedMin": 45,
+    "warnAt": "18:20:00",
+    "criticalAt": "19:05:00"
+  }
+]

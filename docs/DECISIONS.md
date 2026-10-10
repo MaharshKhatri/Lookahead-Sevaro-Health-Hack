@@ -104,3 +104,65 @@ Each flag carries `sinceMs`, which the late-event impact uses for correction win
 - `readCsvText` gained `columns` (header-less) and `relaxColumnCount` options, plus `CsvRow.cellCount`.
 - `src/data/events.ts` holds the one event-row mapper, which the loader and live append both use.
 - `fields.optionalInstant` was added.
+
+## Session 3: detect layer (2026-10-10)
+
+**D-30 Detection is built only on replay.** `detect(dataset, nowMs)` calls `replay` once and derives everything else from that state plus static facts (credentials, roster shifts, baseline, coverage blocks), gathered into a `StaffingModel`. Nothing in `src/detect` reads raw events for state. The one exception is a lookup table from event id to event reference, used only to cite evidence.
+- Replay gained two provenance fields: `shiftStartedBy` and `lastCallEndedBy`.
+- The brief's numeric rules live in `detect/brief-rules.ts`: the standards table, the 2-minute cooldown, low volume at 6 (day) / 4 (night), the 5-minute retry, the 90-minute minimum horizon, and the 60-minute open-notes window. Interpretations stay in `policy.ts`.
+
+**D-31 Routability (OQ-24(b)).** `routableNow` returns every check with `affects: routable | verified | info`, a detail string and `because` refs.
+- **Rule 1:** on shift (roster or scheduled arrival, half-open) and credentialed.
+- **Rule 2:** active call; active video; EXTERNAL_VIDEO_SUSPECTED; Temporarily Unavailable; phone ringing (OQ-17); assigned-but-not-contacted (OQ-23, flagged `inferred: true`); call ended < 2 min ago (OQ-07, calls only).
+- **Never blocking (info):** documenting (OQ-06) and In Meeting (brief).
+- **Unverified:** agent offline, or no presence signals at all (a scheduled arrival with no events).
+- **Per-consult checks:** with `forConsultId`, the consult's own ringing call or pending assignment is not "another call" (brief wording).
+
+**D-32 Route choice (rules 3-5).** Candidates are everyone the replay tracks plus scheduled arrivals on shift.
+- Order: low-volume tier first (consults ≤ 6 on a day shift, ≤ 4 on a night shift; OQ-10), then fewest consults, then least recently answered (never answered first), then id (OQ-26).
+- `chosen: null` with rule ROUTE_NO_ONE_ELIGIBLE is a routing failure.
+- Validation: all 4 `routing_attempt_failed` events are reproduced with the expected blockers. Historical agreement is 54/100 (informational).
+
+**D-33 Standards.** Every row of the brief's table is evaluated for each open consult's current stage and type.
+- Comparison: at or past the threshold on exact elapsed time (OQ-05).
+- Clocks start at stage entry; the note clock uses `noteClockStartMs` (OQ-18).
+- `warnAtMs` and `criticalAtMs` are always returned.
+- Open notes near shift end: notes = assigned consults in Note Pending or Documentation. The window is `[shiftEnd − 60 min, …)`, inclusive. `levelAtWindow` projects the level for physicians whose window hasn't opened yet.
+
+**D-34 Demand.** The trailing-60 count of `consult_received` (from replay `receivedMs`) in `(now − 60 min, now]` is compared strictly greater than the p90 for the ET hour containing now (OQ-03, OQ-19). Only weekday baselines exist (OQ-03 addendum).
+
+**D-35 Projection semantics (OQ-24(a)).**
+- **Timeline:** now, then every `PROJECTION_STEP_MIN` (5) to `PROJECTION_HORIZON_MIN` (120; detect refuses < 90), plus every exact boundary inside the horizon: roster shift ends, scheduled arrival starts and ends, and coverage block edges on today's and tomorrow's ET dates.
+- **required** = block minimum (OQ-01) + 1 while the hospital spikes at now (OQ-19 hold).
+- **staffed** = on shift at t + credentialed + current status not Temporarily Unavailable (OQ-28). Agent-offline physicians are counted and listed as unverified; arrivals are counted and listed.
+- **Gaps:** contiguous points where staffed < required, merged. A gap starts exactly at a boundary, because staffing only changes at boundaries. It ends at the first point where coverage is restored, or `beyond_horizon`.
+- **Causes**, computed against the previous point: shift_end (with the departing physician's `shift_started` event as evidence), block_change, spike (with consult_received evidence) and temp_unavailable.
+- **Two outputs:** the default includes scheduled arrivals (OQ-27); `gapsExcludingArrivals` and `timelineExcludingArrivals` are reported alongside.
+- **Routable-now counts** per hospital are separate fields.
+
+**D-36 Scheduled arrivals.** Included by default, per the brief's roster note ("A scheduled night shift is not a split-shift offer"): a scheduled shift is coverage that is already arranged. Shift length is 12 h (OQ-27). Arrivals are routable from their start but unverified.
+
+**D-37 Attention scoring.** score = Σ factors from `policy.ATTENTION_WEIGHTS`:
+- **Kind base:** deadlock 60, breach 40, gap 35, imminent 20, open notes 20, spike 15, signal 10.
+- **Level:** critical 30, warning 10. Deadlocks count as critical; an imminent item uses the level it will reach.
+- **Stroke at risk:** 25.
+- **Urgency:** 20 × (1 − timeToImpact / horizon).
+- **Overdue:** 0.5 per minute past the crossed threshold, capped at 15.
+- **Escalates to critical within 15 min:** 8.
+- **Item-specific:** shortfall 10 per missing physician; spike excess 5 per consult over p90 (cap 20); 5 per open note; signal points per flag.
+
+Severity comes from score bands (≥ 110 critical, ≥ 80 high, ≥ 50 medium). Items sort by score descending, then id ascending; ids are an FNV-1a hash of kind + entities.
+
+At 18:20 this ranks the two routing deadlocks first (135), then the four stroke critical breaches (115.5–118). Every item carries ≥ 1 why-bullet citing rule and numbers, ≥ 1 event reference, a headline of ≤ 90 characters, and a score breakdown that sums to the score.
+
+**D-38 One item per consult standard.** A consult/standard pair yields at most one item:
+- a STANDARD_BREACH when already at warning or critical;
+- otherwise an IMMINENT_BREACH when the warning threshold falls within `IMMINENT_WINDOW_MIN` (15).
+
+A warning that turns critical within 15 minutes stays one STANDARD_BREACH item with an escalation bullet and +8 points, rather than also getting an IMMINENT item. IN_MEETING_INTERRUPTIBLE is not an attention item, because it is not a conflict.
+
+**D-39 Deadlock definition.** A ROUTING_DEADLOCK is an open, unassigned consult for which `chooseRoute` (consult-specific) finds no routable physician. Its evidence is the routing failures plus the signals of the physicians who block it (on shift and credentialed), never of physicians excluded by credentials or shift.
+
+**D-40 Time travel past the last event.** `detect` at a later instant uses only the known events. Activity with no ending event stays open (calls, videos), so standards keep escalating. PHY-011's scheduled shift appears at 19:00, PHY-003 and PHY-006 drop off at 19:00, and the SYN-005 spike ages out of the trailing window by 19:30. Simulating future activity is the routing twin's job, not detection's.
+
+**D-41 Performance.** Labels for ET clock times are memoized, a timeline point's ET time of day is computed once, and the routability matrix is computed once and reused for routes and routable-now counts. `detect` at 18:20 takes about 7–10 ms median in isolation and about 18 ms with the full suite running in parallel, against a 30 ms target. `pnpm report:detect` renders `docs/DETECT_1820.md` from the same report.

@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r run typecheck && tsc -p tsconfig.json",
     "test": "pnpm -r run test",
     "recon": "tsx scripts/recon.ts",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "report:detect": "tsx scripts/detect-report.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

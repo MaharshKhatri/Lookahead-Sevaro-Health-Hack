@@ -24,6 +24,7 @@ export interface PhysicianDraft {
   onRoster: boolean;
   shift: { startMs: EpochMs; endMs: EpochMs } | null;
   shiftStartedMs: EpochMs | null;
+  shiftStartedBy: EventRef | null;
   status: { value: SelfReportedStatus | null; sinceMs: EpochMs | null; because: EventRef[] };
   agent: { online: boolean; sinceMs: EpochMs | null; because: EventRef[] };
   camera: { active: boolean | null; sinceMs: EpochMs | null; because: EventRef[] };
@@ -31,6 +32,7 @@ export interface PhysicianDraft {
   activeVideo: ActiveVideo | null;
   ringing: Ringing | null;
   lastCallEndedMs: EpochMs | null;
+  lastCallEndedBy: EventRef | null;
   lastVideoEndedMs: EpochMs | null;
   consultsThisShift: number;
   callsThisShift: number;
@@ -147,6 +149,7 @@ function toPhysicianState(ctx: ReplayContext, p: PhysicianDraft, open: readonly 
     onRoster: p.onRoster,
     shift: p.shift,
     shiftStartedMs: p.shiftStartedMs,
+    shiftStartedBy: p.shiftStartedBy,
     selfStatus: { value: p.status.value, because: p.status.because, rule: 'STATUS_SELF_REPORTED' },
     agent: { ...p.agent },
     camera: { ...p.camera },
@@ -154,6 +157,7 @@ function toPhysicianState(ctx: ReplayContext, p: PhysicianDraft, open: readonly 
     activeVideo: p.activeVideo,
     ringing: p.ringing,
     lastCallEndedMs: p.lastCallEndedMs,
+    lastCallEndedBy: p.lastCallEndedBy,
     lastVideoEndedMs: p.lastVideoEndedMs,
     consultsThisShift: p.consultsThisShift,
     callsThisShift: p.callsThisShift,

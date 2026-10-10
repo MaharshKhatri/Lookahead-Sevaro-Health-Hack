@@ -9,3 +9,4 @@ export { parseDataset, DATASET_FILES, SNAPSHOT_UNASSIGNED, type DatasetTexts } f
 export { parseInstant, parseClockTime, parseTimeBlock } from './data/fields';
 export type { PendingEvent } from './data/events';
 export * from './replay';
+export * from './detect';

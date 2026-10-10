@@ -25,6 +25,35 @@ export const RULES = {
   FLAG_TEMP_UNAVAILABLE_ASSIGNED: { cites: 'Operational Situations: "A physician becomes temporarily unavailable while a stroke consult is still assigned to them."' },
   FLAG_RINGING_UNANSWERED: { cites: 'How Calls Reach Physicians rule 2: "anyone whose phone is already ringing for another call"; OQ-17' },
   FLAG_IN_MEETING_INTERRUPTIBLE: { cites: 'Availability: "Camera active with status In Meeting: available (internal meetings are interruptible)."' },
+
+  // Routing: brief "How Calls Reach Physicians (Synthetic Routing Rules)"; OQ-24(b).
+  ROUTE_ON_SHIFT: { cites: 'Routing rule 1: "Eligible physicians are on shift"; scheduled arrivals per OQ-27' },
+  ROUTE_CREDENTIALED: { cites: 'Routing rule 1: "... and credentialed at the calling hospital"' },
+  ROUTE_NOT_ON_CALL: { cites: 'Routing rule 2: "Remove anyone busy"; Availability: "On a Synapse call or video session: busy"' },
+  ROUTE_NOT_ON_VIDEO: { cites: 'Routing rule 2: "Remove anyone busy"; Availability: "On a Synapse call or video session: busy"' },
+  ROUTE_NOT_EXTERNAL_VIDEO: { cites: 'Routing rule 2 + Availability: camera active with no Synapse session and not In Meeting -> "Treat as busy"' },
+  ROUTE_NOT_TEMP_UNAVAILABLE: { cites: 'Routing rule 2 + Availability: self-reported "Temporarily Unavailable"' },
+  ROUTE_PHONE_NOT_RINGING: { cites: 'Routing rule 2: "anyone whose phone is already ringing for another call"; OQ-17' },
+  ROUTE_NO_PENDING_FIRST_CONTACT: { cites: 'Routing rule 2 (ringing) as inferred from data: assigned consult not yet contacted; OQ-23' },
+  ROUTE_CALL_COOLDOWN: { cites: 'Routing rule 2: "anyone who ended a call less than 2 minutes ago"; OQ-07 (calls only)' },
+  ROUTE_DOCUMENTING_ALLOWED: { cites: 'OQ-06: documenting does not make a physician busy for routing' },
+  ROUTE_IN_MEETING_ALLOWED: { cites: 'Availability: "Camera active with status In Meeting: available (internal meetings are interruptible)"' },
+  ROUTE_AGENT_VERIFIED: { cites: 'Availability: "Agent offline: routing assumes the physician is available, but this is unverified. Surface the risk."' },
+  ROUTE_LOW_VOLUME_PRIORITY: { cites: 'Routing rule 3: low volume this shift (6 or fewer on days, 4 or fewer on nights) gets priority; OQ-10, OQ-26' },
+  ROUTE_FEWEST_CONSULTS: { cites: 'Routing rule 4: fewest consults this shift; ties to whoever answered least recently; OQ-26' },
+  ROUTE_NO_ONE_ELIGIBLE: { cites: 'Routing rule 5: "If nobody is eligible, the routing attempt fails"' },
+
+  // Operational Standards (brief table), OQ-05 comparison, OQ-18 note clock, OQ-22 open notes.
+  STANDARD_TIME_IN_STAGE: { cites: 'Operational Standards table; OQ-05 (>= on exact elapsed)' },
+  STANDARD_NOTE_CLOCK: { cites: 'Operational Standards: "Note Pending + Documentation, from end of video or call"; OQ-18' },
+  STANDARD_OPEN_NOTES_NEAR_SHIFT_END: { cites: 'Operational Standards: "Open notes within 60 min of the physician\'s shift end" (Any / 2 or more); OQ-22' },
+
+  // Coverage and demand: brief "Coverage and Split-Shift Eligibility"; OQ-01, OQ-02, OQ-19, OQ-24(a).
+  DEMAND_SPIKE_TRAILING_60: { cites: 'Coverage: "A demand spike (trailing 60-minute consults above the hospital\'s p90 baseline for that hour) raises the requirement by one"; OQ-03, OQ-19' },
+  COVERAGE_STAFFED_CAPACITY: { cites: 'Coverage: "minimum number of available, credentialed physicians per time block"; OQ-02, OQ-24(a), OQ-28' },
+  COVERAGE_SHIFT_END: { cites: 'Coverage: gap "at a projected time (for example, when shifts end at 19:00)"; OQ-21' },
+  COVERAGE_SCHEDULED_ARRIVAL: { cites: 'Off-shift roster note: "A scheduled night shift is not a split-shift offer"; OQ-27' },
+  COVERAGE_BLOCK_CHANGE: { cites: 'coverage_requirements.csv time blocks; OQ-01' },
 } as const;
 
 export type RuleCode = keyof typeof RULES;

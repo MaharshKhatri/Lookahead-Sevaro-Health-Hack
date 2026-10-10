@@ -29,8 +29,11 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 | OQ-21 | Offer/shift overlap boundary; shift-end source | Open |
 | OQ-22 | "Open notes within 60 min of shift end" | Open |
 | OQ-23 | Assigned-but-not-contacted physician in routing | Supported |
-| OQ-24 | Two notions of "available": staffed capacity vs routable now | Open (documented, not implemented) |
+| OQ-24 | Two notions of "available": staffed capacity vs routable now | Implemented (Session 3) |
 | OQ-25 | Repeated or backward stage events | Open |
+| OQ-26 | Ordering inside routing rule 3's low-volume tier | Open |
+| OQ-27 | Scheduled arrivals from the off-shift roster | Supported |
+| OQ-28 | Self-reported status during a projection | Open |
 
 ---
 
@@ -54,6 +57,7 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** "trailing 60-minute consults above the hospital's p90 baseline for that hour".
 - **Data:** the column is `hour_start_et`. Every hospital's mean peaks at 17:00 ET, including Chicago, Denver and Los Angeles hospitals (DATA_PROFILE "Coverage requirements and baseline volume"). That is consistent with ET buckets, not hospital-local ones.
 - **Default:** buckets are ET, and each row covers consults received in `[hour_start, hour_start + 1 h)`. `BASELINE_HOUR_ZONE = ET_ZONE`. "That hour" is the ET hour containing the evaluation time (OQ-19).
+- **Addendum (Session 3):** baseline rows have `dow_type = weekday` only. On Monday–Friday ET those rows are used; on a weekend day there is no baseline, so no spike is evaluated (rather than borrowing weekday numbers). `BASELINE_WEEKDAY_DOW_TYPE = 'weekday'`.
 - **Verify:** SYN-005 has 5 consults received in (17:20, 18:20] against p90 = 1 for 18:00 ET. That matches the hidden situation "A hospital generates several consults in under an hour, well above its baseline". No other hospital is above its p90.
 
 ### OQ-04 Duplicate-detection key
@@ -197,7 +201,7 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
     - not within 2 minutes of a call end (OQ-07: calls only).
 
     Documenting does not block (OQ-06), and In Meeting is interruptible (brief).
-- **Status:** documented only; routability is not implemented in Session 2. The replay state already holds every input both notions need: `selfStatus`, `activeCalls`, `activeVideo`, `camera`, `agent`, `ringing`, `lastCallEndedMs`, `openConsultIds` / `contactedMs`, `consultsThisShift` and `lastAnsweredMs`.
+- **Status:** implemented in Session 3. (a) is `detect/coverage.ts`; (b) is `detect/routing.ts` `routableNow` / `chooseRoute`. They are reported side by side (`coverage.routableNow`) and never mixed. Originally documented in Session 2, which did not implement routability. The replay state already holds every input both notions need: `selfStatus`, `activeCalls`, `activeVideo`, `camera`, `agent`, `ringing`, `lastCallEndedMs`, `openConsultIds` / `contactedMs`, `consultsThisShift` and `lastAnsweredMs`.
 - **Verify:** (a) against the OQ-02 check (exactly one projected gap, exactly one eligible off-shift physician). (b) against the 4 `routing_attempt_failed` events (OQ-23).
 
 ### OQ-25 Repeated or backward stage events
@@ -205,3 +209,35 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Data:** neither happens in the reference stream; correct-mode replay produces zero stage warnings. A second imaging request (CT then MRI) or a re-triage is plausible in judges' live data.
 - **Default:** re-entering the current stage keeps the original entry time, so the stage timer keeps running from first entry. A move to an earlier lifecycle stage is applied and raises an integrity warning. Nothing changes after Signed Off (warning). `STAGE_REENTRY_KEEPS_ENTRY_TIME = true`, `STAGE_REGRESSION = 'apply_with_warning'`.
 - **Verify:** not in the snapshot. Covered by `test/reducer.robustness.test.ts`.
+
+### OQ-26 Ordering inside routing rule 3's low-volume tier
+- **Brief:** rule 3: "Physicians with low volume this shift (6 or fewer consults on days, 4 or fewer on nights) get priority". Rule 4: "Otherwise, route to the eligible physician with the fewest consults this shift. Ties go to whoever answered least recently." It doesn't say how to choose *among* several low-volume physicians.
+- **Default:** use rule 4's ordering inside the priority tier: fewest consults, then least recently answered (latest `incoming_call_started`; never-answered first), then physician id for determinism. `LOW_VOLUME_TIER_ORDER = 'fewest_consults_then_least_recent_answer'`.
+- **Note:** with only day physicians, the tier changes nothing, because sorting by consults already puts ≤ 6 ahead of > 6. It matters when day and night physicians mix: a night physician with 5 consults is not low volume, but a day physician with 6 is (`test/routing.failures.test.ts`).
+- **Verify:** informational only. chooseRoute picks the actual historical assignee in 54 of 100 assignments (DECISIONS D-18: the generator only loosely follows rule 2).
+
+### OQ-27 Scheduled arrivals from the off-shift roster
+- **Brief:** the off-shift roster note says "PHY-011 and PHY-012 are night physicians whose shifts start at 19:00 and 20:00. A scheduled night shift is not a split-shift offer." The roster gives `next_shift_start` but no shift end.
+- **Default:**
+  - A roster physician is on shift from `next_shift_start` for `SCHEDULED_SHIFT_HOURS = 12`.
+  - From then they count in staffed capacity and satisfy routing rule 1.
+  - They are routable but unverified until they produce presence signals.
+  - `SCHEDULED_ARRIVALS_COUNT_AS_ON_SHIFT = true`.
+  - The projection is also reported without arrivals (`gapsExcludingArrivals`).
+- **Effect at 18:20:**
+  - PHY-011 (credentialed at SYN-005) arrives at 19:00, so the SYN-005 gap from 19:00 that the no-arrivals variant shows closes, and SYN-005 holds 2/2 until 20:00.
+  - At 20:00 PHY-005 leaves. With the held spike (OQ-19), SYN-005 needs 2 and has only PHY-011.
+  - At 20:00 SYN-008 (tier A, needs 2) also drops to PHY-011 alone.
+  - PHY-012 (20:00) keeps SYN-010 at 1/1.
+- **Verify:** the brief's hidden situation "Exactly one off-shift physician is fully eligible to cover the projected gap" still holds. For an offer at the 20:00 SYN-005 / SYN-008 gaps, PHY-009 is the only fully eligible physician:
+  - PHY-011 and PHY-012 are on scheduled shifts;
+  - PHY-013 has opted out;
+  - PHY-014 has 59 h worked;
+  - PHY-010 is not credentialed at either hospital.
+
+  To be confirmed in the eligibility session.
+
+### OQ-28 Self-reported status during a projection
+- **Brief:** silent on how long a self-reported status lasts.
+- **Default:** a physician's current status persists through the projection. PHY-008 (Temporarily Unavailable since 18:12:40) is not counted at SYN-006/007/010/011 for the whole horizon. `PROJECTION_HOLDS_CURRENT_STATUS = true`.
+- **Verify:** no snapshot evidence. SYN-010 at 19:00 is 1/1 (PHY-002) under either reading. If PHY-008 came back, SYN-010 would be 2/1 until 20:00.

@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
 const IO_MODULES = ['fs', 'fs/promises', 'path', 'http', 'https', 'net', 'child_process'].flatMap((m) => [m, `node:${m}`]);
 
 export default defineConfig(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', 'data/**', 'docs/**', 'apps/web/.next/**', 'apps/web/next-env.d.ts', 'apps/web/test-results/**', 'apps/web/playwright-report/**'] },
+  { ignores: ['site/**', '**/node_modules/**', '**/dist/**', '**/coverage/**', 'data/**', 'docs/**', 'apps/web/.next/**', 'apps/web/next-env.d.ts', 'apps/web/test-results/**', 'apps/web/playwright-report/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   { languageOptions: { globals: globals.node } },

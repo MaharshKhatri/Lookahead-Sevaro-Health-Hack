@@ -52,6 +52,23 @@ export function NextActions({ view, limit = 6 }: { readonly view: ViewDTO; reado
     [role, busy, send],
   );
 
+  // Command palette (UI pass): `lookahead:propose` proposes that action now; a `?propose=<id>` link from another page only SELECTS it (a link never sends a command by itself).
+  useEffect(() => {
+    const onPropose = (e: Event) => {
+      const id = (e as CustomEvent<{ actionId?: string }>).detail?.actionId;
+      const a = view.intel?.nextBestActions.find((x) => x.id === id);
+      if (a !== undefined) void propose(a);
+    };
+    window.addEventListener('lookahead:propose', onPropose);
+    return () => window.removeEventListener('lookahead:propose', onPropose);
+  }, [view.intel, propose]);
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get('propose');
+    const i = want === null ? -1 : actions.findIndex((a) => a.id === want);
+    if (i >= 0) setSelected(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping() || e.metaKey || e.ctrlKey || e.altKey) return;

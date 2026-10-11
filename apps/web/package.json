@@ -30,6 +30,7 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "4.1.18",
     "@types/luxon": "^3.7.1",

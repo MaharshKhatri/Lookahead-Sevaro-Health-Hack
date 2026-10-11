@@ -3,7 +3,9 @@
 import { useMemo, useState } from 'react';
 import type { RewindReportDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
+import type { ClinicalConstantsDTO } from '@/server/opener';
 import { LiveProvider } from './live';
+import { clippedImpact, scaled } from './Opener';
 import { TopBar } from './TopBar';
 import { Chip, Panel, cx } from './ui';
 
@@ -13,6 +15,12 @@ import { Chip, Panel, cx } from './ui';
  * later had routing failures, markers for the rule tripping, the pre-alert,
  * the activation and the online time, the three-line comparison and the
  * assumptions box. Hand-written SVG; every number is engine output.
+ *
+ * Impact panel (sprint A3, LOOKAHEAD-DEFINED, illustrative): stroke
+ * consult-minutes averted (actual - anticipatory) up to the slider's origin,
+ * via clippedImpact (the client mirror of the engine's impactSummary, tested
+ * for equality); at the last origin the line totals, as on /opener. The
+ * Saver 2006 rates arrive as a prop from the server (clinical constants).
  */
 
 const W = 820;
@@ -80,7 +88,57 @@ function Chart({ r, idx }: { readonly r: RewindReportDTO; readonly idx: number }
   );
 }
 
-function Body({ report }: { readonly report: RewindReportDTO | null }) {
+const NO_RATES = { neuronsPerMin: 0, synapsesPerMin: 0, agingWeeksPerMin: 0, passThroughRatio: 1 } as const;
+
+/** "Saver 2006" from the citation string ("Saver JL. ... 2006;..."). */
+function shortCitation(citation: string): string {
+  const author = citation.split(/[\s,.]/)[0] ?? '';
+  const year = /\b(?:19|20)\d{2}\b/.exec(citation)?.[0] ?? '';
+  return `${author} ${year}`.trim();
+}
+
+export function ImpactPanel({ report, idx, clinical }: { readonly report: RewindReportDTO; readonly idx: number; readonly clinical: ClinicalConstantsDTO | undefined }) {
+  const last = report.origins.length - 1;
+  const origin = report.origins[Math.min(idx, last)];
+  const untilMs = idx >= last || origin === undefined ? undefined : origin.tMs;
+  const rates = clinical ?? NO_RATES;
+  const full = clippedImpact(report.lines, rates);
+  const now = clippedImpact(report.lines, rates, untilMs);
+  // At the last origin the line totals are used; they count open consults to the rewind's evaluation horizon (assumptions note), so say so.
+  const horizonMs = (report as RewindReportDTO & { readonly evalHorizonMs?: number }).evalHorizonMs;
+  const span =
+    untilMs !== undefined
+      ? `From ${etHm(report.fromMs)} to ${etHm(untilMs)} ET`
+      : horizonMs === undefined || horizonMs <= report.toMs
+        ? `From ${etHm(report.fromMs)} to ${etHm(report.toMs)} ET`
+        : `From ${etHm(report.fromMs)} to ${etHm(report.toMs)} ET (open consults counted to ${etHm(horizonMs)} ET)`;
+  let sentence: string;
+  if (full.zero) sentence = 'On this dataset, anticipation did not reduce stroke delay; see the reactive comparison below.';
+  else if (now.zero) sentence = `${span}, anticipation had not yet averted any stroke consult-minutes of unassigned delay; move the slider later to see where it would have.`;
+  else {
+    sentence = `${span}, Lookahead would have averted ${now.strokeMinutesAverted} stroke consult-minutes of unassigned delay.`;
+    if (clinical !== undefined) {
+      sentence += ` If that delay passed ${clinical.passThroughRatio}:1 into treatment delay for a typical large-vessel stroke, that is ~${scaled(now.neuronsEstimate, 1e6)}M neurons, ~${scaled(now.synapsesEstimate, 1e9)}B synapses and ~${scaled(now.agingWeeksEstimate, 1)} weeks of brain aging (${shortCitation(clinical.citation)}).`;
+    }
+  }
+  return (
+    <Panel title="Clinical impact (estimate)" testId="impact" right={<span className="num text-[12px] text-muted">actual {now.actualMin} · reactive {now.reactiveMin} · anticipatory {now.anticipatoryMin} min</span>}>
+      <div className="p-3">
+        <p className="text-[18px] leading-snug" data-testid="impact-sentence">
+          {sentence}
+        </p>
+        <p className="mt-2 text-[12px] text-muted" data-testid="impact-footer">
+          Extrapolation from published averages applied to a simulated day. Not a clinical outcome measurement.{' '}
+          <a href="/clinical-sources" className="text-accent underline">
+            Sources and assumptions
+          </a>
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+function Body({ report, clinical }: { readonly report: RewindReportDTO | null; readonly clinical: ClinicalConstantsDTO | undefined }) {
   const [idx, setIdx] = useState(report === null ? 0 : report.origins.length - 1);
   if (report === null) {
     return (
@@ -96,6 +154,7 @@ function Body({ report }: { readonly report: RewindReportDTO | null }) {
   const names = report.hospitalNames ?? {};
   return (
     <main className="scroll-thin flex-1 space-y-3 overflow-y-auto p-3" data-testid="rewind">
+      <ImpactPanel report={report} idx={idx} clinical={clinical} />
       <Panel title={<>REWIND <span className="normal-case tracking-normal text-text">— the day as if Lookahead had been running</span></>} right={<span className="num text-[12px] text-muted">{report.origins.length} origins · {etHm(report.fromMs)}–{etHm(report.toMs)} ET · step {report.stepMin} min</span>}>
         <div className="p-3">
           <Chart r={report} idx={idx} />
@@ -218,12 +277,12 @@ function Body({ report }: { readonly report: RewindReportDTO | null }) {
   );
 }
 
-export function RewindView({ initial, report }: { readonly initial: ViewDTO | null; readonly report: RewindReportDTO | null }) {
+export function RewindView({ initial, report, clinical }: { readonly initial: ViewDTO | null; readonly report: RewindReportDTO | null; readonly clinical?: ClinicalConstantsDTO }) {
   return (
     <LiveProvider initial={initial}>
       <div className="flex h-screen flex-col overflow-hidden">
         <TopBar />
-        <Body report={report} />
+        <Body report={report} clinical={clinical} />
       </div>
     </LiveProvider>
   );

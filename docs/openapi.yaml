@@ -366,6 +366,23 @@ paths:
       summary: '{enabled, lastSentAtMs, webhookTarget (none | dev_sink | external), nowMs}.'
       responses:
         '200': { description: Simulator status., content: { application/json: { schema: { type: object } } } }
+  /api/architecture:
+    get:
+      tags: [console]
+      summary: Live counters from the action log (recommendations acted on, decisions made by AI, messages sent without approval, PHI guard checks) and the runtime badges (hard-coded-ID scan, last real test run).
+      responses:
+        '200': { description: Counters and badges., content: { application/json: { schema: { type: object } } } }
+  /api/scale-test:
+    post:
+      tags: [admin]
+      summary: 'Run the scale bench (xN, default 20, ?scale=N) in an isolated child process; concurrency 1 (409 when busy); SCALE_TEST_TIMEOUT_MS (default 30000) -> 504 with the stage reached.'
+      parameters:
+        - { name: scale, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Measured per-stage timings at x1 and xN., content: { application/json: { schema: { type: object } } } }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        '504': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     ingestSignature:

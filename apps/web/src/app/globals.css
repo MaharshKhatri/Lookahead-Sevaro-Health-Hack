@@ -123,3 +123,9 @@ body {
     animation: none;
   }
 }
+
+/* Cross-highlight flash (palette jumps, Horizon Line hover). */
+.flash-focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import type { Incident } from '@lookahead/engine';
+import { useEffect, useState } from 'react';
+import type { Incident, NextBestAction } from '@lookahead/engine';
 import type { AttentionDTO } from '@/lib/dto';
 import { IncidentList } from './Incidents';
 import { relMinutes } from '@/lib/format';
 import { Explain } from './Explain';
-import { EvidenceChip, Panel, SeverityChip, StrokeTag, cx } from './ui';
+import { EvidenceChip, Panel, cx } from './ui';
+import { Button as KitButton, Chip as KitChip, PRIORITY_WORD, PriorityGlyph, severityPriority } from '@/ui/kit';
 
 /**
  * LEFT "NOW — what needs attention": the engine's ranked attention list
@@ -54,36 +55,55 @@ export function ScoreBar({ item }: { readonly item: AttentionDTO }) {
   );
 }
 
-function Card({ item, top, open, onToggle }: { readonly item: AttentionDTO; readonly top: boolean; readonly open: boolean; readonly onToggle: () => void }) {
+function Card({ item, top, open, onToggle, action }: { readonly item: AttentionDTO; readonly top: boolean; readonly open: boolean; readonly onToggle: () => void; readonly action: NextBestAction | null }) {
+  const pr = severityPriority(item.severity);
+  const rule = pr === 'P1' ? 'border-l-critical' : pr === 'P2' ? 'border-l-warning' : pr === 'P3' ? 'border-l-info' : 'border-l-border';
   return (
     <article
       data-testid={top ? 'attention-top' : 'attention-card'}
       data-attention-id={item.id}
-      className={cx(
-        'rounded-lg border bg-raised/60 transition-colors',
-        top ? 'border-critical/80 bg-critical/8 pulse-critical' : 'border-border hover:border-muted/60',
-      )}
+      data-hospital-ids={item.hospitalIds.join(' ')}
+      className={cx('rounded-[2px] border border-l-2 border-border bg-panel transition-colors', rule, top && 'bg-raised/60')}
     >
-      <button type="button" onClick={onToggle} aria-expanded={open} className="w-full px-3.5 py-3 text-left">
-        <div className="flex items-center gap-2">
-          <span className={cx('num font-semibold', top ? 'text-[22px] text-text' : 'text-[15px] text-muted')}>#{item.rank}</span>
-          <SeverityChip severity={item.severity} />
-          {item.strokeAtRisk && <StrokeTag />}
-          <span className="text-[12px] text-muted">{KIND_LABEL[item.kind] ?? item.kind}</span>
-          <span className={cx('num ml-auto whitespace-nowrap font-semibold', item.timeToImpactMs <= 0 ? 'text-critical' : 'text-warning', top ? 'text-[16px]' : 'text-[13px]')}>
-            {item.timeToImpactMs <= 0 ? 'NOW' : relMinutes(item.timeToImpactMs)}
-          </span>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="w-full px-3 py-2.5 text-left">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+          <PriorityGlyph p={pr} />
+          <span className={pr === 'P1' ? 'text-critical' : pr === 'P2' ? 'text-warning' : 'text-muted'}>{PRIORITY_WORD[pr]}</span>
+          {item.strokeAtRisk && <span className="text-critical">· Stroke</span>}
+          <span className="font-normal normal-case tracking-normal text-muted">{KIND_LABEL[item.kind] ?? item.kind}</span>
+          <span className={cx('num ml-auto whitespace-nowrap text-[13px] normal-case tracking-normal', item.timeToImpactMs <= 0 ? 'text-critical' : 'text-warning')}>{item.timeToImpactMs <= 0 ? 'now' : `in ${relMinutes(item.timeToImpactMs)}`}</span>
         </div>
-        <h3 data-testid="attention-headline" className={cx('mt-1.5 font-semibold leading-snug text-text', top ? 'text-[20px]' : 'text-[16px]')}>
+        <h3 data-testid="attention-headline" className={cx('mt-1 font-semibold leading-snug text-text', top ? 'text-[18px]' : 'text-[15px]')}>
           {item.headline}
         </h3>
+        {item.why[0] !== undefined && <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-muted">{item.why[0]}</p>}
+        {item.consultIds.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {item.consultIds.slice(0, 3).map((c) => (
+              <KitChip key={c} id>
+                {c}
+              </KitChip>
+            ))}
+          </div>
+        )}
       </button>
+      {action !== null && (
+        <div className="flex items-center gap-2 border-t border-border px-3 py-1.5 text-[13px]">
+          <span className="min-w-0 flex-1 truncate text-text" title={action.title}>
+            <span className="text-muted">Recommended: </span>
+            {action.title}
+          </span>
+          <KitButton kind="primary" data-testid="attention-propose" onClick={() => window.dispatchEvent(new CustomEvent('lookahead:propose', { detail: { actionId: action.id } }))}>
+            Propose
+          </KitButton>
+        </div>
+      )}
       {open && (
-        <div className="space-y-3 border-t border-border px-3.5 pb-3.5 pt-3">
-          <ul className="space-y-1.5 text-[14px] leading-snug text-text/90">
+        <div className="space-y-3 border-t border-border px-3 pb-3 pt-2.5">
+          <ul className="space-y-1.5 text-[13px] leading-snug text-text/90">
             {item.why.map((w) => (
               <li key={w} className="flex gap-2">
-                <span className="mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                <span className="mt-[7px] inline-block h-1 w-1 shrink-0 bg-muted" />
                 <span>{w}</span>
               </li>
             ))}
@@ -107,6 +127,30 @@ export function AttentionList({ items, incidents, reduction }: { readonly items:
   const topId = items[0]?.id;
   const isOpen = (id: string) => openIds[id] ?? id === topId;
   const showIncidents = mode === 'incidents' && incidents !== undefined;
+  // Line 4 of a queue item: the engine's recommended action for the incident this item belongs to (D-95).
+  // Command palette focus jumps (UI pass): `lookahead:focus` {kind, id} or a `?focus=kind:id` link scrolls to and flashes the matching element.
+  useEffect(() => {
+    const flash = (kind: string, id: string) => {
+      if (kind === 'incident') setMode('incidents');
+      window.setTimeout(() => {
+        const sel = kind === 'incident' ? `[data-incident-id="${CSS.escape(id)}"]` : kind === 'hospital' ? `[data-hospital-id="${CSS.escape(id)}"], [data-hospital-ids~="${CSS.escape(id)}"]` : `[data-physician-id="${CSS.escape(id)}"]`;
+        const el = document.querySelector<HTMLElement>(sel);
+        if (el === null) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.classList.add('flash-focus');
+        window.setTimeout(() => el.classList.remove('flash-focus'), 1600);
+      }, 50);
+    };
+    const onFocus = (e: Event) => {
+      const d = (e as CustomEvent<{ kind?: string; id?: string }>).detail;
+      if (d?.kind !== undefined && d.id !== undefined) flash(d.kind, d.id);
+    };
+    const q = new URLSearchParams(window.location.search).get('focus');
+    if (q !== null && q.includes(':')) flash(q.slice(0, q.indexOf(':')), q.slice(q.indexOf(':') + 1));
+    window.addEventListener('lookahead:focus', onFocus);
+    return () => window.removeEventListener('lookahead:focus', onFocus);
+  }, []);
+  const actionOf = (id: string): NextBestAction | null => incidents?.find((inc) => inc.memberItemIds.includes(id))?.recommendedAction ?? null;
   return (
     <Panel
       testId="panel-now"
@@ -138,9 +182,9 @@ export function AttentionList({ items, incidents, reduction }: { readonly items:
         {showIncidents ? (
           <IncidentList incidents={incidents} items={items} />
         ) : (
-          <div className="space-y-2.5 p-3">
+          <div className="space-y-2 p-2.5">
             {items.map((it, i) => (
-              <Card key={it.id} item={it} top={i === 0} open={isOpen(it.id)} onToggle={() => setOpenIds((o) => ({ ...o, [it.id]: !isOpen(it.id) }))} />
+              <Card key={it.id} item={it} top={i === 0} open={isOpen(it.id)} action={actionOf(it.id)} onToggle={() => setOpenIds((o) => ({ ...o, [it.id]: !isOpen(it.id) }))} />
             ))}
             {items.length === 0 && <p className="p-4 text-muted">Nothing needs attention at this instant.</p>}
           </div>

@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import type { Need } from '@lookahead/engine';
 import type { CellClass, CoverageCellDTO, CoverageGridDTO, CoverageRowDTO, DemandChipDTO } from '@/lib/dto';
-import { etEnd, etHm } from '@/lib/format';
+import { etEnd, etHm, localHm, zoneAbbr } from '@/lib/format';
 import { CLASS_WORD, Chip, ClassChip, NeedChip, Panel, cx, shortName } from './ui';
 import { Pips } from '@/ui/kit';
 
@@ -38,7 +38,7 @@ function cellTitle(row: CoverageRowDTO, c: CoverageCellDTO): string {
   return lines.join('\n');
 }
 
-function Row({ row, cells, markerStarts }: { readonly row: CoverageRowDTO; readonly cells: readonly CoverageCellDTO[]; readonly markerStarts: ReadonlySet<number> }) {
+function Row({ row, cells, markerStarts, nowMs }: { readonly row: CoverageRowDTO; readonly cells: readonly CoverageCellDTO[]; readonly markerStarts: ReadonlySet<number>; readonly nowMs: number }) {
   return (
     <tr data-testid={`coverage-row-${row.hospitalId}`} data-hospital-id={row.hospitalId}>
       <th scope="row" className="sticky left-0 z-10 border-b border-border bg-panel py-1 pl-3 pr-2 text-left align-middle font-normal">
@@ -48,6 +48,11 @@ function Row({ row, cells, markerStarts }: { readonly row: CoverageRowDTO; reado
           <span>
             {row.hospitalId} · routable now {row.routableNow}
           </span>
+          {row.timeZone !== 'America/New_York' && (
+            <span className="text-ink3" title={`Local time at ${row.hospitalName} (${row.timeZone})`} data-testid="row-local-time">
+              {localHm(nowMs, row.timeZone)} {zoneAbbr(nowMs, row.timeZone)}
+            </span>
+          )}
         </div>
       </th>
       {cells.map((c, i) => (
@@ -89,7 +94,7 @@ export function CoverageGrid({ grid, demand, needs }: { readonly grid: CoverageG
       className="h-full"
       title={
         <>
-          {span === '2h' ? 'NEXT 2 HOURS' : 'NEXT 5 HOURS'} <span className="normal-case tracking-normal text-text">— coverage</span>
+          {span === '2h' ? 'NEXT 2 HOURS' : 'NEXT 5 HOURS'} <span className="hidden normal-case tracking-normal text-text 2xl:inline">— coverage</span>
         </>
       }
       right={
@@ -100,7 +105,7 @@ export function CoverageGrid({ grid, demand, needs }: { readonly grid: CoverageG
           <ClassChip cls="DEADLOCK" />
           <div className="ml-2 flex overflow-hidden rounded-md border border-border">
             {(['2h', 'all'] as const).map((s) => (
-              <button key={s} type="button" onClick={() => setSpan(s)} className={cx('px-2 py-0.5 text-[12px] font-semibold', span === s ? 'bg-accent text-bg' : 'bg-raised text-muted')}>
+              <button key={s} type="button" onClick={() => setSpan(s)} className={cx('whitespace-nowrap px-2 py-0.5 text-[12px] font-semibold', span === s ? 'bg-accent text-bg' : 'bg-raised text-muted')}>
                 {s === '2h' ? '2 h' : '5 h'}
               </button>
             ))}
@@ -134,7 +139,7 @@ export function CoverageGrid({ grid, demand, needs }: { readonly grid: CoverageG
           </thead>
           <tbody>
             {issues.map((v) => (
-              <Row key={v.row.hospitalId} row={v.row} cells={v.cells} markerStarts={markerStarts} />
+              <Row key={v.row.hospitalId} nowMs={grid.nowMs} row={v.row} cells={v.cells} markerStarts={markerStarts} />
             ))}
             {ok.length > 0 && (
               <Fragment>
@@ -146,7 +151,7 @@ export function CoverageGrid({ grid, demand, needs }: { readonly grid: CoverageG
                     </button>
                   </td>
                 </tr>
-                {showOk && ok.map((v) => <Row key={v.row.hospitalId} row={v.row} cells={v.cells} markerStarts={markerStarts} />)}
+                {showOk && ok.map((v) => <Row key={v.row.hospitalId} nowMs={grid.nowMs} row={v.row} cells={v.cells} markerStarts={markerStarts} />)}
               </Fragment>
             )}
           </tbody>

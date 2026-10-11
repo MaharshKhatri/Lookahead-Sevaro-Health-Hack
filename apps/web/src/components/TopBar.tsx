@@ -129,7 +129,7 @@ export function TopBar() {
           <span className={cx('ml-1 text-[12px] font-semibold uppercase tracking-wide', playing ? 'text-ok' : 'text-muted')}>{playing ? `▶ playing ${c?.speed}×` : '⏸ paused'}</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="hidden items-center gap-1.5 md:flex">
           <Button size="sm" tone="muted" testId="clock-toggle" title={playing ? 'Pause the sim clock' : 'Play the sim clock'} onClick={() => void clock({ action: playing ? 'pause' : 'play' })}>
             {playing ? '⏸ Pause' : '▶ Play'}
           </Button>

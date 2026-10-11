@@ -18,7 +18,7 @@ function Sheet({ view, theme }: { readonly view: ViewDTO; readonly theme: 'night
   const firstCell = (r: (typeof rows)[number]) => r.cells[0];
   const past = view.forecast.hospitals[0]?.past.map((b) => b.count) ?? [];
   return (
-    <div className={cx('space-y-4 bg-bg p-4 text-text', theme === 'day' && 'theme-day')} data-testid={`design-${theme}`}>
+    <div className={cx('space-y-4 bg-bg p-4 text-text', theme === 'day' ? 'theme-day' : 'theme-night')} data-testid={`design-${theme}`}>
       <h2 className="text-[22px] font-semibold">{theme === 'night' ? 'Night' : 'Day'}</h2>
       <KitPanel title="Tokens">
         <div className="grid grid-cols-4 gap-2 p-3 text-[11px]">
@@ -65,9 +65,11 @@ function Sheet({ view, theme }: { readonly view: ViewDTO; readonly theme: 'night
           ))}
         </div>
         <div className="flex flex-wrap gap-2 px-3 pb-3">
-          {Object.keys(STATUS_STYLE).map((s) => (
-            <StatusPill key={s} status={s} />
-          ))}
+          {Object.keys(STATUS_STYLE)
+            .filter((s, i, all) => all.findIndex((x) => STATUS_STYLE[x]?.word === STATUS_STYLE[s]?.word) === i)
+            .map((s) => (
+              <StatusPill key={s} status={s} />
+            ))}
         </div>
       </KitPanel>
       <KitPanel title="Queue items (live attention)">

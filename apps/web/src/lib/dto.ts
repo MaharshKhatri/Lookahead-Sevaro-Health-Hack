@@ -79,6 +79,8 @@ export interface CoverageCellDTO {
 export interface CoverageRowDTO {
   readonly hospitalId: string;
   readonly hospitalName: string;
+  /** IANA zone from hospitals.csv (local_timezone); the row shows the hospital's local time (UI pass). */
+  readonly timeZone: string;
   readonly worst: CellClass;
   readonly routableNow: number;
   readonly cells: readonly CoverageCellDTO[];

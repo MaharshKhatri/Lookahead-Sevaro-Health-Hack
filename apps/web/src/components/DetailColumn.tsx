@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ViewDTO } from '@/lib/dto';
-import { etHm } from '@/lib/format';
+import { etHm, localHm, zoneAbbr } from '@/lib/format';
 import { Button, Chip, SectionTitle } from '@/ui/kit';
 import { type Selection, clearHighlight, highlight } from '@/ui/select';
 
@@ -30,6 +30,7 @@ export function DetailColumn({ view }: { readonly view: ViewDTO }) {
   }, [sel]);
   if (sel === null) return null;
   const names = new Map(view.coverage.rows.map((r) => [r.hospitalId, r.hospitalName]));
+  const zones = new Map(view.coverage.rows.map((r) => [r.hospitalId, r.timeZone]));
   const items = view.attention.filter((a) => a.hospitalIds.some((h) => sel.hospitalIds.includes(h)) || a.physicianIds.some((p) => sel.physicianIds.includes(p)));
   const incidents = view.intel.incidents.filter((i) => i.memberItemIds.some((m) => items.some((a) => a.id === m)));
   const actions = incidents.flatMap((i) => (i.recommendedAction === null ? [] : [i.recommendedAction])).filter((a, i, all) => all.findIndex((b) => b.id === a.id) === i);
@@ -60,6 +61,7 @@ export function DetailColumn({ view }: { readonly view: ViewDTO }) {
             {sel.hospitalIds.map((h) => (
               <Chip key={h} tone="neutral">
                 {names.get(h) ?? h}
+                {zones.get(h) !== undefined && zones.get(h) !== 'America/New_York' && ` · ${localHm(view.clock.nowMs, zones.get(h) ?? '')} ${zoneAbbr(view.clock.nowMs, zones.get(h) ?? '')}`}
               </Chip>
             ))}
           </div>

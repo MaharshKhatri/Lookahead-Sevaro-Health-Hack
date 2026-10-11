@@ -43,3 +43,22 @@ export function minutesBetween(a: number, b: number): number {
 export const severityWord = (s: string) => s.toUpperCase();
 
 export const titleCase = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+/** HH:mm in a hospital's own IANA zone (hospitals.csv local_timezone), 24-hour; CLAUDE.md rule 4. */
+export function localHm(ms: number, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
+  } catch {
+    return etHm(ms);
+  }
+}
+
+/** Short zone label for a hospital row, e.g. "CT" from America/Chicago at that instant. */
+export function zoneAbbr(ms: number, timeZone: string): string {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' }).formatToParts(ms).find((p) => p.type === 'timeZoneName');
+    return (part?.value ?? '').replace(/^([A-Z])[SD]T$/, '$1T');
+  } catch {
+    return '';
+  }
+}

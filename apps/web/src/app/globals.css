@@ -46,6 +46,23 @@ html[data-theme='day'],
   --color-info: #1d4fa8;
 }
 
+/* Night tokens on demand (UI pass): /design shows both themes side by side whatever the page theme is. */
+.theme-night {
+  color-scheme: dark;
+  --color-bg: #0b1320;
+  --color-panel: #121c2e;
+  --color-raised: #1a2740;
+  --color-border: #263552;
+  --color-text: #e8eef5;
+  --color-muted: #93a4b8;
+  --color-ink3: #8193a8;
+  --color-accent: #2bb3a3;
+  --color-critical: #f2555a;
+  --color-warning: #f5a524;
+  --color-ok: #3fb68b;
+  --color-info: #6ea8fe;
+}
+
 /* Visible focus: 2 px action outline on every focusable element (keyboard users). */
 :focus-visible {
   outline: 2px solid var(--color-accent);

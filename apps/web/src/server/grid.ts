@@ -63,7 +63,7 @@ export function buildGrid(decision: DecisionReport, pGap?: ReadonlyMap<string, n
       };
     });
     const worst = cells.reduce<CellClass>((w, c) => (RANK[c.class] > RANK[w] ? c.class : w), 'OK');
-    return { hospitalId: h.hospitalId, hospitalName: h.hospitalName, worst, routableNow: cov.routableNow[h.hospitalId] ?? 0, cells };
+    return { hospitalId: h.hospitalId, hospitalName: h.hospitalName, timeZone: h.localTimezone, worst, routableNow: cov.routableNow[h.hospitalId] ?? 0, cells };
   });
 
   // Non-OK hospitals first (worst class, then earliest issue), then the all-OK group.

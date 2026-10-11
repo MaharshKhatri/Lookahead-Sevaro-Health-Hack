@@ -14,6 +14,7 @@
     "report:detect": "tsx scripts/detect-report.ts",
     "report:decide": "tsx scripts/decide-report.ts",
     "demo:loop": "tsx scripts/demo-loop.ts",
+    "report:forecast": "tsx scripts/forecast-report.ts",
     "aws:create-table": "tsx scripts/aws/create-table.ts",
     "golden:freeze": "tsx scripts/golden-freeze.ts"
   },

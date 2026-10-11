@@ -5,7 +5,7 @@ import { etHm } from '@/lib/format';
 import { buildGrid } from './grid';
 import { integritySummary } from './integrity';
 import { ledgerRow } from './ledger';
-import { acceptedWhatIf, escalationDTOs, offerDTOs, proposalContext, recommendedWhatIf, trapDTO } from './offers';
+import { acceptedWhatIf, escalationDTOs, offerDTOs, proposalContext, reassignmentDTOs, recommendedWhatIf, trapDTO } from './offers';
 import type { StoreSnapshot } from './store';
 
 /**
@@ -71,6 +71,7 @@ function buildView(s: StoreSnapshot): ViewDTO {
     offers,
     nextOffer: nextOfferDTO(s, d, offers),
     escalations: escalationDTOs(s.log, nowMs, (id) => det.attention.find((a) => a.id === id)?.headline ?? null),
+    reassignments: reassignmentDTOs(s.log, nowMs),
     physicians: physicianRows(det.state),
     consults: consultRows(det.state, det.standards, nowMs),
     sample: injectSample(s, d),

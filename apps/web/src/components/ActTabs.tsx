@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import type { LedgerRowDTO, OfferDTO, TrapDTO, ViewDTO, WhatIfDTO, WhatIfRowDTO } from '@/lib/dto';
+import type { EscalationDTO, LedgerRowDTO, OfferDTO, ReassignmentDTO, TrapDTO, ViewDTO, WhatIfDTO, WhatIfRowDTO } from '@/lib/dto';
 import { countdown, etEnd, etHm } from '@/lib/format';
 import { useLive } from './live';
 import { Button, Chip, NeedChip, StatusPill, cx, shortName } from './ui';
@@ -310,27 +310,70 @@ export function OffersTab({ view }: { readonly view: ViewDTO }) {
       {offers.map((o) => (
         <OfferCard key={o.offerId} o={o} view={view} />
       ))}
-      {view.escalations.length > 0 && (
-        <div className="pt-2">
-          <div className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-muted">Escalations</div>
-          {view.escalations.map((e) => (
-            <div key={e.escalationId} className="mb-1.5 rounded-md border border-border bg-raised/40 p-2 text-[13px]">
-              <div className="flex items-center gap-2">
-                {e.authorizedAtMs === null ? <Chip tone="warning">AWAITING LEAD</Chip> : <Chip tone="ok">AUTHORIZED</Chip>}
-                <span className="font-semibold">{e.headline}</span>
-              </div>
-              <div className="mt-1 text-muted">
-                raised {etHm(e.raisedAtMs)} by {e.raisedBy}: {e.reason}
-                {e.authorizedAtMs !== null && ` · authorized ${etHm(e.authorizedAtMs)} by ${e.authorizedBy}${e.note === null ? '' : ` (${e.note})`}`}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="pt-1 text-right">
-        <a href="/api/audit.csv" className="text-[13px] text-info underline">
+      <OtherActions view={view} />
+      <div className="flex justify-end gap-3 pt-1 text-[13px]">
+        <a href="/api/audit.csv" className="text-info underline">
           Download audit CSV
         </a>
+        <a href="/api/audit/actions.csv" className="text-info underline" data-testid="actions-csv">
+          Download action audit
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The other two brief interventions, from the action log (D-88): escalations
+ * (coordinator raises, clinical lead authorizes) and reassignment requests
+ * (coordinator right, recorded as "requested in Synapse"; no approval step).
+ */
+function OtherActions({ view }: { readonly view: ViewDTO }) {
+  const items = [
+    ...view.escalations.map((e) => ({ key: e.escalationId, atMs: e.raisedAtMs, node: <EscalationRow e={e} /> })),
+    ...view.reassignments.map((r) => ({ key: `${r.consultId}-${r.requestedAtMs}-${r.toPhysicianId}`, atMs: r.requestedAtMs, node: <ReassignmentRow r={r} /> })),
+  ].sort((a, b) => b.atMs - a.atMs);
+  if (items.length === 0) return null;
+  return (
+    <div className="pt-2" data-testid="other-actions">
+      <div className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-muted">Other actions · {items.length}</div>
+      {items.map((x) => (
+        <div key={x.key} className="mb-1.5 rounded-md border border-border bg-raised/40 p-2 text-[13px]">
+          {x.node}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EscalationRow({ e }: { readonly e: EscalationDTO }) {
+  return (
+    <div data-testid="escalation-row" data-authorized={e.authorizedAtMs !== null}>
+      <div className="flex items-center gap-2">
+        <Chip tone="info">ESCALATION</Chip>
+        {e.authorizedAtMs === null ? <Chip tone="warning">AWAITING LEAD</Chip> : <Chip tone="ok">AUTHORIZED</Chip>}
+        <span className="font-semibold">{e.headline}</span>
+      </div>
+      <div className="mt-1 text-muted">
+        raised {etHm(e.raisedAtMs)} by {e.raisedBy}: {e.reason}
+        {e.authorizedAtMs !== null && ` · authorized ${etHm(e.authorizedAtMs)} by ${e.authorizedBy}${e.note === null ? '' : ` (${e.note})`}`}
+      </div>
+    </div>
+  );
+}
+
+function ReassignmentRow({ r }: { readonly r: ReassignmentDTO }) {
+  return (
+    <div data-testid="reassignment-row" data-consult-id={r.consultId}>
+      <div className="flex items-center gap-2">
+        <Chip tone="info">REASSIGN</Chip>
+        <Chip tone="muted">{r.label.toUpperCase()}</Chip>
+        <span className="font-semibold">
+          <span className="num">{r.consultId}</span> at <span className="num">{r.hospitalId}</span>: <span className="num">{r.fromPhysicianId ?? 'unassigned'}</span> → <span className="num">{r.toPhysicianId}</span>
+        </span>
+      </div>
+      <div className="mt-1 text-muted">
+        requested {etHm(r.requestedAtMs)} by {r.requestedBy} · coordinator right, no approval step · {r.toPhysicianId}: {r.why}
       </div>
     </div>
   );

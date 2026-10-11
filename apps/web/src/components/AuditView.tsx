@@ -26,7 +26,15 @@ function Trail({ t }: { readonly t: AuditTrail }) {
   ];
   return (
     <main className="scroll-thin flex-1 space-y-3 overflow-y-auto p-3" data-testid="audit">
-      <Panel title={<>Audit · offer <span className="num normal-case">{t.offerId}</span></>} right={<a href="/api/audit.csv" className="text-[14px] font-semibold text-info underline" data-testid="audit-csv">Download CSV (all offers)</a>}>
+      <Panel
+        title={<>Audit · offer <span className="num normal-case">{t.offerId}</span></>}
+        right={
+          <span className="flex gap-4 text-[14px] font-semibold">
+            <a href="/api/audit.csv" className="text-info underline" data-testid="audit-csv">Download CSV (all offers)</a>
+            <a href="/api/audit/actions.csv" className="text-info underline" data-testid="audit-actions-csv">Download action audit (all interventions)</a>
+          </span>
+        }
+      >
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 p-4">
           <div className="space-y-2 text-[15px]">
             <div className="flex items-center gap-3">

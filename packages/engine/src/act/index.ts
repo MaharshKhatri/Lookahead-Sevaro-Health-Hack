@@ -21,5 +21,22 @@ export {
   type OfferView,
 } from './offers';
 export { coverageEffectOf, fillStatus, frozenNeed, type FillStatus } from './fill';
-export { applyCommand, COMMAND_ROLES, decideWithLog, recommendNext, type ActContext } from './commands';
-export { auditTrail, auditCsv, AUDIT_CSV_COLUMNS, type AuditTrail } from './audit';
+export { applyCommand, COMMAND_ROLES, decideWithLog, recommendNext, planWithLog, standDownRecommended, activationRecommended, type ActContext } from './commands';
+export {
+  foldStandbys,
+  standbyStatus,
+  standbyInFlight,
+  activationLapsed,
+  activatedStandbysOf,
+  standbyOfferLogEntries,
+  standbyHistoryOf,
+  activationTrigger,
+  quietAt,
+  standbyAllowedActions,
+  planFromDecision,
+  STANDBY_IN_FLIGHT,
+  type StandbyRecord,
+  type StandbyStatus,
+  type PlanContext,
+} from './standby';
+export { auditTrail, auditCsv, AUDIT_CSV_COLUMNS, actionAuditRows, actionsCsv, ACTION_CSV_COLUMNS, REASSIGNMENT_NO_APPROVAL_NOTE, type AuditTrail, type ActionAuditRow, type ApprovalState } from './audit';

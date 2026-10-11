@@ -14,7 +14,7 @@ import { StoreError } from './store';
 export const UI_ROLES: readonly UiRole[] = ['coordinator', 'clinical_lead', 'physician'];
 const DEFAULT_ACTOR_ID: Readonly<Record<UiRole, string>> = { coordinator: 'coordinator-on-duty', clinical_lead: 'clinical-lead-on-duty', physician: '' };
 
-type Shape = Readonly<Record<string, 'string' | 'string?' | 'strings?' | 'number?' | 'object' | 'response'>>;
+type Shape = Readonly<Record<string, 'string' | 'string?' | 'strings?' | 'number?' | 'boolean?' | 'object' | 'response' | 'standbyResponse' | 'activationResponse'>>;
 
 const SHAPES: Readonly<Record<CommandType, Shape>> = {
   proposeOffer: { physicianId: 'string', needIds: 'strings?', slotId: 'string?' },
@@ -28,6 +28,17 @@ const SHAPES: Readonly<Record<CommandType, Shape>> = {
   authorizeEscalation: { escalationId: 'string', note: 'string?' },
   requestReassignment: { consultId: 'string', toPhysicianId: 'string' },
   sendInternalAlert: { message: 'string', physicianIds: 'strings?' },
+  // Standby network (Phase 4).
+  proposeStandby: { physicianId: 'string' },
+  approveStandby: { standbyId: 'string', note: 'string?' },
+  rejectStandby: { standbyId: 'string', reason: 'string?' },
+  respondStandby: { standbyId: 'string', physicianId: 'string?', response: 'standbyResponse' },
+  proposeActivation: { standbyId: 'string', force: 'boolean?', reason: 'string?' },
+  approveActivation: { standbyId: 'string', note: 'string?' },
+  rejectActivation: { standbyId: 'string', reason: 'string?' },
+  respondActivation: { standbyId: 'string', physicianId: 'string?', response: 'activationResponse' },
+  releaseStandby: { standbyId: 'string', reason: 'string?' },
+  cancelStandby: { standbyId: 'string', reason: 'string' },
 };
 
 const bad = (message: string) => new StoreError('BAD_REQUEST', message);
@@ -53,8 +64,9 @@ export function parseCommand(body: Record<string, unknown>, actor: ActorRef): Co
     const v = c[field];
     const optional = kind.endsWith('?');
     if (v === undefined || v === null) {
-      if (!optional && kind !== 'response') throw bad(`${type}.${field} is required`);
-      if (kind === 'response') throw bad(`${type}.response must be "accept" or "decline"`);
+      if (!optional && !kind.endsWith('esponse')) throw bad(`${type}.${field} is required`);
+      if (kind === 'response' || kind === 'activationResponse') throw bad(`${type}.response must be "accept" or "decline"`);
+      if (kind === 'standbyResponse') throw bad(`${type}.response must be "ready" or "not_tonight"`);
       continue;
     }
     const ok =
@@ -64,14 +76,18 @@ export function parseCommand(body: Record<string, unknown>, actor: ActorRef): Co
           ? Array.isArray(v) && v.every((x) => typeof x === 'string')
           : kind === 'number?'
             ? typeof v === 'number' && Number.isFinite(v)
-            : kind === 'object'
-              ? typeof v === 'object' && !Array.isArray(v)
-              : v === 'accept' || v === 'decline';
+            : kind === 'boolean?'
+              ? typeof v === 'boolean'
+              : kind === 'object'
+                ? typeof v === 'object' && !Array.isArray(v)
+                : kind === 'standbyResponse'
+                  ? v === 'ready' || v === 'not_tonight'
+                  : v === 'accept' || v === 'decline';
     if (!ok) throw bad(`${type}.${field} has the wrong type`);
     out[field] = v;
   }
   // The physician answers only for themselves (brief: "Accept or decline from a phone; nothing else").
-  if (type === 'respond' && out.physicianId === undefined) out.physicianId = actor.id;
+  if ((type === 'respond' || type === 'respondStandby' || type === 'respondActivation') && out.physicianId === undefined) out.physicianId = actor.id;
   const commandId = typeof c.commandId === 'string' && c.commandId !== '' ? c.commandId : typeof body.commandId === 'string' && body.commandId !== '' ? body.commandId : randomUUID();
   const seq = c.expectedSeq ?? body.expectedSeq;
   if (seq !== undefined && (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0)) throw bad('expectedSeq must be a non-negative integer');

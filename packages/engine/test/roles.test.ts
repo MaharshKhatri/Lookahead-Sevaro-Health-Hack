@@ -37,6 +37,22 @@ const commandFor = (type: CommandType, actor: ActorRef, i: number): Command => {
       return { ...b, type, consultId: 'CON-2102', toPhysicianId: 'PHY-004' };
     case 'sendInternalAlert':
       return { ...b, type, message: 'verify presence', physicianIds: ['PHY-011'] };
+    // Standby network (Phase 4): unknown standby ids are enough to test role gating (FORBIDDEN_ROLE is checked before state).
+    case 'proposeStandby':
+      return { ...b, type, physicianId: 'PHY-010' };
+    case 'approveStandby':
+    case 'rejectStandby':
+    case 'proposeActivation':
+    case 'approveActivation':
+    case 'rejectActivation':
+    case 'releaseStandby':
+      return { ...b, type, standbyId: 'sb-none' };
+    case 'respondStandby':
+      return { ...b, type, standbyId: 'sb-none', physicianId: 'PHY-010', response: 'not_tonight' };
+    case 'respondActivation':
+      return { ...b, type, standbyId: 'sb-none', physicianId: 'PHY-010', response: 'decline' };
+    case 'cancelStandby':
+      return { ...b, type, standbyId: 'sb-none', reason: 'test' };
   }
 };
 
@@ -54,6 +70,16 @@ describe('role enforcement: every command x every role (FORBIDDEN_ROLE exactly w
       authorizeEscalation: ['clinical_lead'],
       requestReassignment: ['coordinator'],
       sendInternalAlert: ['system', 'coordinator'],
+      proposeStandby: ['coordinator'],
+      approveStandby: ['clinical_lead'],
+      rejectStandby: ['clinical_lead'],
+      respondStandby: ['physician'],
+      proposeActivation: ['coordinator'],
+      approveActivation: ['clinical_lead'],
+      rejectActivation: ['clinical_lead'],
+      respondActivation: ['physician'],
+      releaseStandby: ['clinical_lead'],
+      cancelStandby: ['coordinator', 'clinical_lead'],
     });
     expect(DECISION_RIGHTS.SPLIT_SHIFT_OFFER).toMatchObject({ proposer: 'coordinator', approver: 'clinical_lead', acceptor: 'off_shift_physician' });
     expect(DECISION_RIGHTS.VERIFY_PRESENCE.automationAllowed).toBe(true);

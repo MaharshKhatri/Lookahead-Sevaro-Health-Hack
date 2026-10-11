@@ -414,3 +414,39 @@ export const FORECAST_CHECKPOINT_HORIZON_MIN = 180;
 export const STROKE_SHARE_PRIOR_WEIGHT = 2;
 /** LOOKAHEAD-DEFINED (illustrative): risk rank looks at the maximum spike probability within this many minutes, then the 60-min expectation. */
 export const FORECAST_RISK_RANK_WINDOW_MIN = 90;
+
+// ---------------------------------------------------------------- Standby network (Phase 4)
+// The brief's split-shift offer is reactive (the gap already exists). The standby network
+// pre-positions eligible off-shift physicians before a forecast surge. Everything below is
+// LOOKAHEAD-DEFINED (illustrative) unless marked BRIEF; see docs/STANDBY.md and OQ-48..OQ-51.
+
+/** LOOKAHEAD-DEFINED (illustrative): planning horizon and cell size of the gap-probability grid. */
+export const STANDBY_HORIZON_MIN = 180;
+export const STANDBY_CELL_MIN = 15;
+/** LOOKAHEAD-DEFINED (illustrative): minutes from proposal to a sent pre-alert (lead approval), added before time-to-online when sizing a standby window. */
+export const STANDBY_APPROVAL_LATENCY_MIN = 5;
+/** BRIEF (eligibility rule 6: "Offers are at least 2 hours long"): a standby window must be at least this long. */
+export const STANDBY_MIN_WINDOW_MIN = 120;
+/** LOOKAHEAD-DEFINED (illustrative): stroke weighting of a hospital's uncovered minutes, w = (stroke share + 0.25) / 1.25, so a hospital with no stroke history still counts 20 %. */
+export const STANDBY_STROKE_WEIGHT_FLOOR = 0.25;
+/** LOOKAHEAD-DEFINED (illustrative): acceptance estimate pAccept = 0.8 / (1 + 0.25 * declined_30d); the roster's decline count is the only signal we have. */
+export const STANDBY_ACCEPT_BASE = 0.8;
+export const STANDBY_ACCEPT_DECLINE_PENALTY = 0.25;
+/** LOOKAHEAD-DEFINED (illustrative): burden = 1 + 0.2 * declined_30d (physician-fairness: ask the often-asked less). */
+export const STANDBY_BURDEN_DECLINE_WEIGHT = 0.2;
+/** LOOKAHEAD-DEFINED (illustrative): greedy selection stops when the next physician adds under this many expected uncovered minutes, or at this many physicians. */
+export const STANDBY_MIN_GAIN_EUM = 10;
+export const STANDBY_MAX_SELECTED = 3;
+/** LOOKAHEAD-DEFINED (illustrative): activation is recommended when a covered cell has P(gap) >= 0.6 and starts within time-to-online + 15 min, or a covered hospital is deadlocked now. */
+export const STANDBY_ACTIVATE_PGAP = 0.6;
+export const STANDBY_ACTIVATE_LEAD_MIN = 15;
+/** LOOKAHEAD-DEFINED (illustrative): stand-down is recommended when no covered remaining cell has P(gap) >= 0.2 at two consecutive 5-min evaluations (hysteresis, OQ-51). */
+export const STANDBY_RELEASE_PGAP = 0.2;
+export const STANDBY_RECOMPUTE_MIN = 5;
+/** LOOKAHEAD-DEFINED (illustrative): a hospital with max P(gap) at or above this and nobody selected to cover it is an "empty bench". */
+export const STANDBY_EMPTY_BENCH_PGAP = 0.5;
+/** OQ-48: an open standby counts as the physician's one open offer, and a sent pre-alert counts toward 3 offers per week (conservative). */
+export const STANDBY_COUNTS_AS_OFFER = true;
+/** LOOKAHEAD-DEFINED (illustrative): never pre-alert the same physician twice in one night (fairness guard). */
+export const STANDBY_ONE_PREALERT_PER_NIGHT = true;
+export const STANDBY_SCHEMA_VERSION = '1.0';

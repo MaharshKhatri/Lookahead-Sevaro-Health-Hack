@@ -20,7 +20,7 @@ import {
   type OfferRecord,
   type TrapAnalysis,
 } from '@lookahead/engine';
-import type { EscalationDTO, OfferDTO, PublicOfferDTO, TrapDTO, WhatIfDTO, WhatIfRowDTO } from '@/lib/dto';
+import type { EscalationDTO, OfferDTO, PublicOfferDTO, ReassignmentDTO, TrapDTO, WhatIfDTO, WhatIfRowDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { offerPath } from './auth';
 import type { StoreSnapshot } from './store';
@@ -119,6 +119,26 @@ export function escalationDTOs(log: ActionLog, nowMs: number, headlineOf: (atten
       },
     ];
   });
+}
+
+/** Brief "Users and Decision Rights": the coordinator can "Reassign consults" (no approval step); every request is in the action log (D-88). */
+export function reassignmentDTOs(log: ActionLog, nowMs: number): ReassignmentDTO[] {
+  return log.flatMap((e): ReassignmentDTO[] =>
+    e.type !== 'reassignment_requested' || e.atMs > nowMs
+      ? []
+      : [
+          {
+            consultId: e.payload.consultId,
+            hospitalId: e.payload.hospitalId,
+            fromPhysicianId: e.payload.fromPhysicianId,
+            toPhysicianId: e.payload.toPhysicianId,
+            requestedAtMs: e.atMs,
+            requestedBy: who(e.actor) ?? '',
+            label: e.payload.label,
+            why: e.payload.why,
+          },
+        ],
+  );
 }
 
 // ------------------------------------------------------------------ trap + what-if DTOs

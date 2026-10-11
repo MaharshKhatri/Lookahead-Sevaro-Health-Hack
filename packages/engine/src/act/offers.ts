@@ -4,6 +4,7 @@ import type { AcceptedOffer } from '../detect/staffing';
 import { ACCEPTED_OFFER_START, OFFER_CANCEL_ROLES, OFFER_EXPIRY_BOUNDARY } from '../policy';
 import type { EpochMs } from '../types';
 import { actionsKnownAt } from './log';
+import { activatedStandbysOf, standbyOfferLogEntries } from './standby';
 import type { ActionEvent, ActionLog, ActorRef, CommandType, FrozenNeed, OfferProposal, Role } from './types';
 
 /**
@@ -192,6 +193,10 @@ export function listOffers(log: ActionLog, nowMs: EpochMs): OfferView[] {
  * never reached the physician and are left out of the weekly count.
  */
 export function offerLogEntries(log: ActionLog, nowMs: EpochMs): OfferLogEntry[] {
+  return [...offerOnlyLogEntries(log, nowMs), ...standbyOfferLogEntries(log, nowMs)];
+}
+
+function offerOnlyLogEntries(log: ActionLog, nowMs: EpochMs): OfferLogEntry[] {
   return foldOffers(log, nowMs).flatMap((r): OfferLogEntry[] => {
     const status = statusOf(r, nowMs);
     if (r.sent === null && (status === 'rejected' || status === 'cancelled' || status === 'superseded')) return [];
@@ -207,6 +212,10 @@ export function effectiveStartMs(p: OfferProposal, acceptedAtMs: EpochMs): Epoch
 
 /** Accepted offers as staffing (brief "update projected coverage when someone accepts"). */
 export function acceptedOffersOf(log: ActionLog, nowMs: EpochMs): AcceptedOffer[] {
+  return [...acceptedOfferShifts(log, nowMs), ...activatedStandbysOf(log, nowMs)];
+}
+
+function acceptedOfferShifts(log: ActionLog, nowMs: EpochMs): AcceptedOffer[] {
   return foldOffers(log, nowMs).flatMap((r) =>
     r.outcome?.status === 'accepted' && r.outcome.event.type === 'offer_accepted'
       ? [

@@ -204,6 +204,18 @@ export interface EscalationDTO {
   readonly note: string | null;
 }
 
+/** A reassignment request (brief "Users and Decision Rights": the coordinator can "Reassign consults"; recorded as "requested in Synapse", D-88). */
+export interface ReassignmentDTO {
+  readonly consultId: string;
+  readonly hospitalId: string;
+  readonly fromPhysicianId: string | null;
+  readonly toPhysicianId: string;
+  readonly requestedAtMs: number;
+  readonly requestedBy: string;
+  readonly label: string;
+  readonly why: string;
+}
+
 export interface RecStepDTO {
   readonly kind: string;
   readonly summary: string;
@@ -343,6 +355,8 @@ export interface ViewDTO {
     readonly escalationSuggested: boolean;
   };
   readonly escalations: readonly EscalationDTO[];
+  /** Reassignment requests from the action log (D-88; exported with every other action at GET /api/audit/actions.csv). */
+  readonly reassignments: readonly ReassignmentDTO[];
   readonly physicians: readonly PhysicianRowDTO[];
   readonly consults: readonly ConsultRowDTO[];
   readonly sample: InjectSampleDTO;

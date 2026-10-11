@@ -24,6 +24,9 @@ export const ERROR_TEXT: Readonly<Record<string, string>> = {
   BAD_DATASET: 'That dataset does not ingest.',
   UNKNOWN_STAGE: 'That upload is no longer available; upload again.',
   NOT_FOUND: 'Not found.',
+  BAD_SIGNATURE: 'The request signature is missing or wrong.',
+  API_KEY_REQUIRED: 'An API key is required for the v1 read API.',
+  NOT_CONFIGURED: 'This endpoint is not configured on the server.',
   INTERNAL: 'Server error.',
 };
 
@@ -48,6 +51,9 @@ export const ERROR_STATUS: Readonly<Record<string, number>> = {
   BAD_DATASET: 422,
   UNKNOWN_STAGE: 404,
   NOT_FOUND: 404,
+  BAD_SIGNATURE: 401,
+  API_KEY_REQUIRED: 401,
+  NOT_CONFIGURED: 503,
   INTERNAL: 500,
 };
 

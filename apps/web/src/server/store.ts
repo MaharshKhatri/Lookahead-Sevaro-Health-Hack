@@ -24,6 +24,7 @@ import { actContext } from './forecast';
 import { Mutex } from './mutex';
 import { dataDir, liveDir } from './paths';
 import { backendFromEnv, type InjectedRow, type Repos, type StoreBackend } from './repo';
+import { type Dispatcher, startWebhooks } from './webhooks';
 
 /**
  * The single in-memory store behind every route (Sessions 6-7). It holds the
@@ -499,11 +500,15 @@ export function csvRow(e: RawEvent): string {
 
 // ------------------------------------------------------------------ singleton
 
-const holder = globalThis as unknown as { __lookaheadStore?: Store };
+const holder = globalThis as unknown as { __lookaheadStore?: Store; __lookaheadWebhooks?: Dispatcher | null };
 
 /** One store per server process (route bundles and dev reloads share it via globalThis). */
 export function getStore(): Store {
-  holder.__lookaheadStore ??= new Store({ data: dataDir(), live: liveDir() });
+  if (holder.__lookaheadStore === undefined) {
+    holder.__lookaheadStore = new Store({ data: dataDir(), live: liveDir() });
+    // Outbound webhooks (D-96) ride the same subscription SSE uses; nothing runs without LOOKAHEAD_WEBHOOK_URL.
+    holder.__lookaheadWebhooks = startWebhooks(holder.__lookaheadStore);
+  }
   return holder.__lookaheadStore;
 }
 
@@ -516,6 +521,8 @@ export async function getReadyStore(): Promise<Store> {
 
 /** Tests only: drop the singleton so the next getStore() boots from storage again. */
 export function disposeStore(): void {
+  holder.__lookaheadWebhooks?.stop();
+  delete holder.__lookaheadWebhooks;
   holder.__lookaheadStore?.dispose();
   delete holder.__lookaheadStore;
 }

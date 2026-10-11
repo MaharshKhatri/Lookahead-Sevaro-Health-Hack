@@ -1,0 +1,421 @@
+openapi: 3.1.0
+info:
+  title: Lookahead API
+  version: "1.0"
+  summary: Tele-neurology operations command center (Sevaro Challenge 2).
+  description: |
+    Every route the Next.js app serves (apps/web/src/app/api). The /api/v1/*
+    routes are the stable integration surface (D-96); the rest drive the
+    Command Center UI and may change. All instants are epoch milliseconds UTC.
+    Errors are JSON {ok: false, code, message} with the HTTP status from
+    apps/web/src/lib/errors.ts. apps/web/test/openapi.test.ts checks that this
+    file and the route files list the same paths and methods.
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: v1
+    description: Versioned integration API (schemaVersion "1.0").
+  - name: console
+    description: Command Center UI routes.
+  - name: phone
+    description: Physician and clinical-lead phone views.
+  - name: admin
+    description: Dataset upload, demo controls, health.
+paths:
+  /api/v1/events:
+    post:
+      tags: [v1]
+      summary: Push Sevaro event rows (signed, idempotent on event_id).
+      description: |
+        Body is event_stream.csv text (header optional) or JSON (an array of
+        objects keyed by the CSV columns, or {events: [...]}). Rows go through
+        the engine's own parser and dedupe (OQ-04). 200 when every row was
+        accepted or a duplicate, 207 when some rows were rejected.
+      security:
+        - ingestSignature: []
+      parameters:
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+          application/json:
+            schema:
+              oneOf:
+                - type: array
+                  items: { $ref: '#/components/schemas/EventRow' }
+                - type: object
+                  required: [events]
+                  properties:
+                    events:
+                      type: array
+                      items: { $ref: '#/components/schemas/EventRow' }
+      responses:
+        '200': { description: All rows accepted or duplicates., content: { application/json: { schema: { $ref: '#/components/schemas/IngestReport' } } } }
+        '207': { description: Some rows rejected (see rejected[]).., content: { application/json: { schema: { $ref: '#/components/schemas/IngestReport' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/forecast:
+    get:
+      tags: [v1]
+      summary: Surge forecast per hospital, sorted by risk rank (D-85).
+      security: [{ apiKey: [] }, { bearer: [] }]
+      responses:
+        '200': { description: Forecast read model., content: { application/json: { schema: { $ref: '#/components/schemas/V1Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/standby:
+    get:
+      tags: [v1]
+      summary: Standby plan and standbys folded from the action log (D-90); phone links stripped.
+      security: [{ apiKey: [] }, { bearer: [] }]
+      responses:
+        '200': { description: Standby read model., content: { application/json: { schema: { $ref: '#/components/schemas/V1Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/coverage:
+    get:
+      tags: [v1]
+      summary: Coverage projection per hospital (OK / AT_RISK / HARD_GAP / DEADLOCK cells), demand, shift changes.
+      security: [{ apiKey: [] }, { bearer: [] }]
+      responses:
+        '200': { description: Coverage read model., content: { application/json: { schema: { $ref: '#/components/schemas/V1Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/alerts:
+    get:
+      tags: [v1]
+      summary: Ranked attention items with why-bullets and evidence event ids.
+      security: [{ apiKey: [] }, { bearer: [] }]
+      responses:
+        '200': { description: Alerts read model., content: { application/json: { schema: { $ref: '#/components/schemas/V1Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/incidents:
+    get:
+      tags: [v1]
+      summary: Incidents (root-cause groups), next best actions and the 180-min horizon timeline (D-95).
+      security: [{ apiKey: [] }, { bearer: [] }]
+      responses:
+        '200': { description: Incidents read model., content: { application/json: { schema: { $ref: '#/components/schemas/V1Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/view:
+    get:
+      tags: [console]
+      summary: The full Command Center view at the sim clock (memoized per store version).
+      responses:
+        '200': { description: ViewDTO (apps/web/src/lib/dto.ts)., content: { application/json: { schema: { type: object } } } }
+  /api/stream:
+    get:
+      tags: [console]
+      summary: Server-Sent Events {type, version, nowMs}; clients refetch /api/view on a new version.
+      responses:
+        '200': { description: text/event-stream., content: { text/event-stream: { schema: { type: string } } } }
+  /api/commands:
+    post:
+      tags: [console]
+      summary: Apply one Act command (propose, approve, reject, respond, escalate, reassign, standby lifecycle).
+      parameters:
+        - { name: x-lookahead-role, in: header, required: true, schema: { type: string, enum: [coordinator, clinical_lead, physician] } }
+        - { name: x-lookahead-actor-id, in: header, required: false, schema: { type: string } }
+        - { name: x-lookahead-offer-token, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [command], properties: { command: { type: object }, token: { type: string } } } } }
+      responses:
+        '200': { description: Command applied (or replayed by commandId)., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /api/events:
+    post:
+      tags: [console]
+      summary: Append event_stream.csv rows at the sim clock (the console's live-test inject; DEMO_MODE or a coordinator session).
+      requestBody:
+        required: true
+        content:
+          text/csv: { schema: { type: string } }
+          application/json: { schema: { type: object, properties: { text: { type: string } } } }
+      responses:
+        '200': { description: Per-line inject result., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /api/clock:
+    post:
+      tags: [admin]
+      summary: 'Move the sim clock: set | play | pause | advance | jump (runs a system tick).'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [action], properties: { action: { type: string, enum: [set, play, pause, advance, jump] } } } } }
+      responses:
+        '200': { description: Clock state., content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/demo/reset:
+    post:
+      tags: [admin]
+      summary: Clear the live state; clock back to the reference instant.
+      responses:
+        '200': { description: Reset., content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/health:
+    get:
+      tags: [admin]
+      summary: Store backend, Bedrock availability, dataset version, clock.
+      responses:
+        '200': { description: Health., content: { application/json: { schema: { type: object } } } }
+  /api/integrity:
+    get:
+      tags: [console]
+      summary: Correct vs naive replay against the reference snapshot; late-event corrections.
+      responses:
+        '200': { description: Integrity report., content: { application/json: { schema: { type: object } } } }
+  /api/forecast:
+    get:
+      tags: [console]
+      summary: Surge forecast at the sim clock (the object /api/view carries).
+      responses:
+        '200': { description: SurgeForecastDTO., content: { application/json: { schema: { type: object } } } }
+  /api/standby:
+    get:
+      tags: [console]
+      summary: Standby plan and every standby folded from the action log.
+      responses:
+        '200': { description: Standby plan and standbys., content: { application/json: { schema: { type: object } } } }
+  /api/standby/{id}:
+    get:
+      tags: [phone]
+      summary: Physician phone view of a standby (delivered texts only; needs the link token).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: PublicStandbyDTO., content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/offers/{id}:
+    get:
+      tags: [phone]
+      summary: Physician phone view of an offer (delivered message only; needs the link token).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: PublicOfferDTO., content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/rewind:
+    get:
+      tags: [console]
+      summary: Counterfactual replay of the day (actual vs reactive vs anticipatory).
+      responses:
+        '200': { description: RewindReportDTO., content: { application/json: { schema: { type: object } } } }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/quality:
+    get:
+      tags: [console]
+      summary: Forecast backtest report (docs/forecast_backtest.json).
+      responses:
+        '200': { description: Backtest report., content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/narrate:
+    post:
+      tags: [console]
+      summary: Plain-English narration of engine facts (Bedrock with fidelity guard, or template).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [kind, id], properties: { kind: { type: string }, id: { type: string } } } } }
+      responses:
+        '200': { description: '{text, source, checks}.', content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/audit/{offerId}:
+    get:
+      tags: [console]
+      summary: Audit trail of one offer, built only from the frozen action log.
+      parameters:
+        - { name: offerId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Audit trail., content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/audit.csv:
+    get:
+      tags: [console]
+      summary: One row per offer (27 pinned columns).
+      responses:
+        '200': { description: CSV., content: { text/csv: { schema: { type: string } } } }
+  /api/audit/actions.csv:
+    get:
+      tags: [console]
+      summary: One row per action event (every intervention, who acted, approval state).
+      responses:
+        '200': { description: CSV., content: { text/csv: { schema: { type: string } } } }
+  /api/auth/lead:
+    get:
+      tags: [phone]
+      summary: Whether this browser holds the clinical-lead role.
+      responses:
+        '200': { description: '{lead: boolean}.', content: { application/json: { schema: { type: object } } } }
+    post:
+      tags: [phone]
+      summary: Enter the clinical-lead PIN (sets an HttpOnly cookie; rate limited).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [pin], properties: { pin: { type: string } } } } }
+      responses:
+        '200': { description: PIN accepted., content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [phone]
+      summary: Forget the lead PIN on this browser.
+      responses:
+        '200': { description: Cleared., content: { application/json: { schema: { type: object } } } }
+  /api/auth/session:
+    get:
+      tags: [admin]
+      summary: Roles this browser's cookies grant, and whether DEMO_MODE is on.
+      responses:
+        '200': { description: Session., content: { application/json: { schema: { type: object } } } }
+    post:
+      tags: [admin]
+      summary: 'Start a role session {role, pin} (coordinator | clinical_lead | admin); rate limited.'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [role, pin], properties: { role: { type: string }, pin: { type: string } } } } }
+      responses:
+        '200': { description: Session cookie set., content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [admin]
+      summary: Forget every role on this browser.
+      responses:
+        '200': { description: Cleared., content: { application/json: { schema: { type: object } } } }
+  /api/dataset:
+    get:
+      tags: [admin]
+      summary: Active dataset, the one Revert would restore, and the storage backend.
+      responses:
+        '200': { description: Dataset info., content: { application/json: { schema: { type: object } } } }
+    post:
+      tags: [admin]
+      summary: Stage an upload (multipart "files", optional "mapping"); returns the ingest report. Nothing changes until activate.
+      requestBody:
+        required: true
+        content: { multipart/form-data: { schema: { type: object } } }
+      responses:
+        '200': { description: Stage result., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /api/dataset/mapping:
+    post:
+      tags: [admin]
+      summary: Write mapping.json into a staged upload and re-ingest (OQ-45).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [stageId, mapping], properties: { stageId: { type: string }, mapping: { type: object } } } } }
+      responses:
+        '200': { description: Stage result., content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/dataset/activate:
+    post:
+      tags: [admin]
+      summary: Swap the store's dataset atomically (previous kept for Revert).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [stageId], properties: { stageId: { type: string } } } } }
+      responses:
+        '200': { description: Activated., content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/dataset/revert:
+    post:
+      tags: [admin]
+      summary: Back to the previously active dataset (fresh run).
+      responses:
+        '200': { description: Reverted., content: { application/json: { schema: { type: object } } } }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    ingestSignature:
+      type: apiKey
+      in: header
+      name: x-lookahead-signature
+      description: 'sha256=<hex of HMAC-SHA256(LOOKAHEAD_INGEST_SECRET, raw body)>. Without a secret the endpoint is open only in DEMO_MODE.'
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-lookahead-api-key
+      description: LOOKAHEAD_API_KEY; required for /api/v1 reads when DEMO_MODE=false.
+    bearer:
+      type: http
+      scheme: bearer
+      description: LOOKAHEAD_API_KEY as a bearer token.
+  parameters:
+    Signature:
+      name: x-lookahead-signature
+      in: header
+      required: false
+      schema: { type: string, pattern: '^sha256=[0-9a-f]{64}$' }
+  responses:
+    Error:
+      description: '{ok: false, code, message}.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [ok, code, message]
+      properties:
+        ok: { const: false }
+        code: { type: string }
+        message: { type: string }
+    EventRow:
+      type: object
+      description: One event_stream.csv row, keyed by its column names (unknown keys are a 400).
+      required: [event_id, event_time, event_type]
+      additionalProperties: false
+      properties:
+        event_id: { type: string }
+        event_time: { type: string, description: ISO-8601 with an explicit offset. }
+        ingested_at: { type: string, description: ISO-8601; defaults to the sim clock when absent. }
+        consult_id: { type: string }
+        event_type: { type: string }
+        physician_id: { type: string }
+        hospital_id: { type: string }
+        description: { type: string }
+    IngestReport:
+      type: object
+      required: [schemaVersion, ok, signature, format, nowMs, accepted, duplicates, late, rejected]
+      properties:
+        schemaVersion: { const: '1.0' }
+        ok: { type: boolean }
+        signature: { type: string, enum: [verified, unsigned_demo] }
+        format: { type: string, enum: [csv, json] }
+        nowMs: { type: integer }
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        late: { type: integer, description: Accepted rows whose ingested_at trails event_time by more than LATE_EVENT_FLAG_LAG_MS (OQ-12). }
+        rejected:
+          type: array
+          items: { type: object, required: [row, reason], properties: { row: { type: integer }, reason: { type: string } } }
+        rowBasis: { type: string, enum: [line, index] }
+        acceptedEventIds: { type: array, items: { type: string } }
+        duplicateEventIds: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
+        knownFromMs: { type: [integer, 'null'] }
+    V1Envelope:
+      type: object
+      required: [schemaVersion, asOfMs, dataset]
+      properties:
+        schemaVersion: { const: '1.0' }
+        asOfMs: { type: integer, description: The sim clock. }
+        dataset:
+          type: object
+          required: [key, label, version]
+          properties:
+            key: { type: string }
+            label: { type: string }
+            version: { type: integer }
+      additionalProperties: true

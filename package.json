@@ -18,7 +18,9 @@
     "aws:create-table": "tsx scripts/aws/create-table.ts",
     "golden:freeze": "tsx scripts/golden-freeze.ts",
     "report:rewind": "tsx scripts/rewind-report.ts",
-    "scale:bench": "tsx scripts/scale-bench.ts"
+    "scale:bench": "tsx scripts/scale-bench.ts",
+    "test:report": "tsx scripts/test-report.ts",
+    "final-check": "tsx scripts/final-check.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.1149.0",

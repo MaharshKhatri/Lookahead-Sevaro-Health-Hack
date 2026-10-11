@@ -1,0 +1,31 @@
+# Lookahead CI (sprint B4, D-97): install, typecheck, lint, engine + web tests,
+# the hard-coded-ID scan on packages/engine/src, the golden freeze, and the
+# production build. Playwright is left to `pnpm --filter web e2e` locally
+# (it needs a built server and takes minutes).
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - name: Hard-coded ID scan (CLAUDE.md rule 5)
+        run: |
+          if grep -rnE '\b(PHY|CON|SYN|EVT)-[0-9]+' packages/engine/src; then
+            echo "engine source contains literal IDs"; exit 1
+          fi
+      - run: pnpm test:report
+      - name: Golden freeze (subset compare against packages/engine/test/golden)
+        run: pnpm --filter @lookahead/engine exec vitest run test/golden.freeze.test.ts
+      - run: pnpm --filter web build

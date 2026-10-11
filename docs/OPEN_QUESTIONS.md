@@ -429,3 +429,9 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** silent (the standby network is our extension).
 - **Default:** activate when a covered cell has P(gap) >= 0.6 (`STANDBY_ACTIVATE_PGAP`) within time-to-online + 15 min, or a covered hospital is deadlocked now; recommend stand-down when no covered remaining cell has P(gap) >= 0.2 (`STANDBY_RELEASE_PGAP`) at two consecutive 5-min evaluations (`STANDBY_RECOMPUTE_MIN`). The engine is pure, so "two consecutive recomputes" is evaluated as "quiet now and quiet one step earlier" from knowledge-time state.
 - **Verify:** `standby.test.ts` (activation recommended by the deadlock; stand-down not recommended while risk is high).
+
+### OQ-52 Role sessions and demo mode
+- **Brief:** "Users and Decision Rights" names the coordinator, the clinical lead and the physician, and who may do what; it says nothing about how a person proves their role.
+- **Default:** PIN-gated HttpOnly role sessions for the coordinator, the clinical lead and an admin; physicians are identified only by the HMAC link they received. `DEMO_MODE=true` (the judging default) lets anyone act as the coordinator without a PIN; the clinical lead needs the PIN in every mode, so no off-shift message can be approved by an anonymous visitor.
+- **Verify:** `apps/web/test/security.test.ts`; D-91.
+

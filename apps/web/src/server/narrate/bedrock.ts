@@ -1,6 +1,6 @@
 import 'server-only';
 import { BedrockClient, ListInferenceProfilesCommand, type InferenceProfileSummary } from '@aws-sdk/client-bedrock';
-import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, ConverseCommand, type GuardrailConfiguration } from '@aws-sdk/client-bedrock-runtime';
 
 /**
  * Claude on Amazon Bedrock through the Converse API (Session 7). Narration
@@ -29,6 +29,19 @@ export interface Narrator {
 type Env = Readonly<Record<string, string | undefined>>;
 
 const region = (env: Env) => env.AWS_REGION ?? env.AWS_DEFAULT_REGION ?? 'us-east-1';
+
+/**
+ * Optional Amazon Bedrock Guardrail on the Converse call (D-91): set
+ * BEDROCK_GUARDRAIL_ID (and BEDROCK_GUARDRAIL_VERSION, default DRAFT). It is a
+ * second, account-side filter on top of our own fidelity guard, which still
+ * runs on every reply; a guardrail intervention surfaces as an empty or
+ * blocked output and the template is served.
+ */
+export function guardrailConfig(env: Env): GuardrailConfiguration | null {
+  const id = env.BEDROCK_GUARDRAIL_ID;
+  if (id === undefined || id.trim() === '') return null;
+  return { guardrailIdentifier: id.trim(), guardrailVersion: (env.BEDROCK_GUARDRAIL_VERSION ?? '').trim() === '' ? 'DRAFT' : (env.BEDROCK_GUARDRAIL_VERSION ?? '').trim() };
+}
 
 /** Prefers Claude Haiku, then Sonnet, then any Claude; newest id first (ids embed release dates/versions). */
 export function pickProfile(profiles: readonly Partial<Pick<InferenceProfileSummary, 'inferenceProfileId' | 'status'>>[], awsRegion: string): string | null {
@@ -85,6 +98,7 @@ export class BedrockNarrator implements Narrator {
     const modelId = st.modelId;
     // Low effort keeps Claude 5.x narration fast; models that reject the field are remembered and called without it.
     const effort = /claude-(haiku|sonnet|opus)-5/i.test(modelId) && !this.noEffort.has(modelId);
+    const guardrail = guardrailConfig(this.env);
     const send = (withEffort: boolean) =>
       this.runtime.send(
         new ConverseCommand({
@@ -92,6 +106,7 @@ export class BedrockNarrator implements Narrator {
           system: [{ text: system }],
           messages: [{ role: 'user', content: [{ text: user }] }],
           inferenceConfig: { maxTokens: 1024 },
+          ...(guardrail === null ? {} : { guardrailConfig: guardrail }),
           ...(withEffort ? { additionalModelRequestFields: { output_config: { effort: 'low' } } } : {}),
         }),
         { abortSignal: AbortSignal.timeout(timeoutMs) },

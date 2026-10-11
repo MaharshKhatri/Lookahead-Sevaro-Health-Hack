@@ -1,4 +1,6 @@
+import { clientKey, requireDemoControl } from '@/server/auth';
 import { guard, json, readJson } from '@/server/http';
+import { enforceRateLimit } from '@/server/ratelimit';
 import { StoreError, getReadyStore } from '@/server/store';
 
 export const dynamic = 'force-dynamic';
@@ -7,10 +9,13 @@ export const runtime = 'nodejs';
 /**
  * POST /api/events: event_stream.csv rows (with or without the header) as
  * text/csv, or JSON {text}. Appended at the sim clock with no restart (brief
- * "What Teams Must Demonstrate" #8). Per-line results.
+ * "What Teams Must Demonstrate" #8). Per-line results. D-91: open in
+ * DEMO_MODE, else a coordinator/admin session; rate limited (60/min default).
  */
 export function POST(req: Request): Promise<Response> {
   return guard(async () => {
+    requireDemoControl(req);
+    enforceRateLimit('events', clientKey(req));
     const type = req.headers.get('content-type') ?? '';
     const text = type.includes('application/json') ? (await readJson(req)).text : await req.text();
     if (typeof text !== 'string' || text.trim() === '') throw new StoreError('BAD_REQUEST', 'send event_stream.csv rows as text/csv or JSON {"text": "..."}');

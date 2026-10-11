@@ -1,3 +1,4 @@
+import { requireDemoControl } from '@/server/auth';
 import { guard, json, readJson } from '@/server/http';
 import { SPEEDS, StoreError, getReadyStore, type ClockAction } from '@/server/store';
 import type { ClockSpeed } from '@/lib/dto';
@@ -20,9 +21,11 @@ const num = (v: unknown, name: string): number | undefined => {
  * POST /api/clock {action: set|play|pause|advance|jump}. set {nowMs?, speed?};
  * play {speed?}; advance {minutes?, seconds?}; jump {to: "HH:mm[:ss]" ET}.
  * Every move runs a system tick so offer expiries are materialized (OQ-36).
+ * D-91: open in DEMO_MODE, else a coordinator/admin session is required.
  */
 export function POST(req: Request): Promise<Response> {
   return guard(async () => {
+    requireDemoControl(req);
     const b = await readJson(req);
     let a: ClockAction;
     switch (b.action) {

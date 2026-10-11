@@ -1,0 +1,65 @@
+# Lookahead (D-93).
+#   docker compose up --build                 # file store, template narration: the laptop demo in a container
+#   docker compose --profile dynamo up --build  # + DynamoDB Local; the app uses STORE=dynamo against it
+# Copy .env.example to .env first; compose reads it for ${VARS} below.
+services:
+  app:
+    build: .
+    image: lookahead:local
+    ports:
+      - '${PORT:-3000}:3000'
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LOOKAHEAD_PUBLIC_ORIGIN: ${LOOKAHEAD_PUBLIC_ORIGIN:-http://localhost:3000}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      STORE: ${STORE:-file}
+      TABLE_NAME: ${TABLE_NAME:-lookahead-log}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # With the dynamo profile, point the SDK at DynamoDB Local (dummy credentials are required by the SDK, never sent anywhere else).
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      NARRATION: ${NARRATION:-off}
+    volumes:
+      - live:/var/lib/lookahead/live
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  dynamodb:
+    profiles: ['dynamo']
+    image: amazon/dynamodb-local:2.5.3
+    command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
+    ports:
+      - '8000:8000'
+    volumes:
+      - dynamodb:/home/dynamodblocal/data
+
+  # One-shot: creates the table in DynamoDB Local (pnpm aws:create-table, idempotent).
+  create-table:
+    profiles: ['dynamo']
+    build:
+      context: .
+      target: deps
+    working_dir: /repo
+    command: ['sh', '-c', 'pnpm install --frozen-lockfile --offline >/dev/null 2>&1 || true; pnpm aws:create-table']
+    environment:
+      TABLE_NAME: ${TABLE_NAME:-lookahead-log}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ENDPOINT_URL: http://dynamodb:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    volumes:
+      - ./scripts:/repo/scripts:ro
+    depends_on:
+      - dynamodb
+
+volumes:
+  live:
+  dynamodb:

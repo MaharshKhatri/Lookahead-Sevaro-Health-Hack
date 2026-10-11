@@ -1,0 +1,17 @@
+.git
+.gitignore
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+data/live
+data/uploads
+docs/screens
+*.log
+.env
+.env.*
+!.env.example
+Dockerfile
+docker-compose.yml

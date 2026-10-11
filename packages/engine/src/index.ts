@@ -32,4 +32,5 @@ export * from './forecast';
 export * from './standby';
 export * from './rewind';
 export * from './incidents';
+export * from './integrate';
 export { mulberry32, seedFromString, type Rng } from './util/rng';

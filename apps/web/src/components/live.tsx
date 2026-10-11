@@ -20,6 +20,24 @@ export interface Toast {
 
 export type CommandInput = { readonly type: string } & Record<string, unknown>;
 
+/** Browser-session roles (D-91): what GET /api/auth/session reports. */
+export type SessionRole = 'coordinator' | 'clinical_lead' | 'admin';
+export interface SessionInfo {
+  readonly roles: readonly SessionRole[];
+  readonly demoMode: boolean;
+}
+
+/** The roles this browser's cookies grant and whether DEMO_MODE is on; a failed fetch reads as no roles, demo on (the server still decides). */
+export async function sessionRoles(): Promise<SessionInfo> {
+  try {
+    const r = await fetch('/api/auth/session', { cache: 'no-store' });
+    const b = (await r.json()) as Partial<SessionInfo>;
+    return { roles: Array.isArray(b.roles) ? b.roles : [], demoMode: b.demoMode !== false };
+  } catch {
+    return { roles: [], demoMode: true };
+  }
+}
+
 interface LiveValue {
   readonly view: ViewDTO | null;
   readonly sse: SseStatus;
@@ -118,14 +136,12 @@ export function LiveProvider({ initial, fixedRole, children }: { readonly initia
     if (fixedRole !== undefined) return;
     try {
       const saved = window.localStorage.getItem(ROLE_KEY);
-      if (saved === 'coordinator') setRoleState(saved);
-      // Clinical lead only if this browser still holds the lead PIN cookie (OQ-44).
-      if (saved === 'clinical_lead')
-        void fetch('/api/auth/lead', { cache: 'no-store' })
-          .then((r) => r.json() as Promise<{ lead?: boolean }>)
-          .then((b) => {
-            if (b.lead === true) setRoleState('clinical_lead');
-          });
+      // A remembered role is restored only while this browser's session still grants it
+      // (coordinator is free in DEMO_MODE; the lead needs the PIN cookie; OQ-44, D-91).
+      if (saved === 'coordinator' || saved === 'clinical_lead')
+        void sessionRoles().then((s) => {
+          if ((saved === 'coordinator' && s.demoMode) || s.roles.includes(saved)) setRoleState(saved);
+        });
     } catch {
       // storage unavailable: keep the default role
     }

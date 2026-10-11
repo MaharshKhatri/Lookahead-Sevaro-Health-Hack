@@ -1,11 +1,14 @@
 import 'server-only';
-import { QUIET_FEED_BANNER_MS, decideWithLog, headSeq, recommendNext, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
+import { QUIET_FEED_BANNER_MS, headSeq, planWithLog, recommendNext, type ActContext, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
 import type { AttentionDTO, ConsultRowDTO, EvidenceDTO, FlagDTO, InjectSampleDTO, OfferContextDTO, PhysicianRowDTO, RecommendationDTO, RecommendedOfferDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
+import { actContext, fitKey, forecastFor, rememberFit } from './forecast';
 import { buildGrid } from './grid';
 import { integritySummary } from './integrity';
 import { ledgerRow } from './ledger';
 import { acceptedWhatIf, escalationDTOs, offerDTOs, proposalContext, reassignmentDTOs, recommendedWhatIf, trapDTO } from './offers';
+import { policyCatalog } from './policy';
+import { pGapIndex, standbyDTOs, standbyPlanDTO } from './standby';
 import type { StoreSnapshot } from './store';
 
 /**
@@ -33,7 +36,11 @@ export const memoSize = (): number => memo.length;
 
 function buildView(s: StoreSnapshot): ViewDTO {
   const nowMs = s.clock.nowMs;
-  const d = decideWithLog({ dataset: s.dataset }, s.log, nowMs);
+  // One engine pass: decide with the log's offers (and activated standbys) plus the standby plan on the memoized forecast fit (Phase 7).
+  const ctx: ActContext = actContext(s.dataset, s.bootId, s.datasetVersion, nowMs);
+  const { plan, fit, decision: d } = planWithLog(ctx, s.log, nowMs);
+  rememberFit(fitKey(s.bootId, s.datasetVersion, nowMs), fit);
+  const ctxWithFit: ActContext = { ...ctx, forecastFit: fit };
   const det = d.detection;
   const hospitalName = (id: string) => det.staffing.hospitalNames.get(id) ?? id;
   const attention = det.attention.map(attentionDTO);
@@ -59,7 +66,7 @@ function buildView(s: StoreSnapshot): ViewDTO {
     ...(lastEventAtMs !== null && nowMs - lastEventAtMs > QUIET_FEED_BANNER_MS ? { noNewEventsSince: lastEventAtMs } : {}),
     integrity: integritySummary(s),
     attention,
-    coverage: buildGrid(d),
+    coverage: buildGrid(d, pGapIndex(plan)),
     demand: det.demand
       .filter((x) => x.spike)
       .map((x) => ({ hospitalId: x.hospitalId, hospitalName: x.hospitalName, count: x.count, p90: x.p90, mean: x.mean, baselineHourEt: x.baselineHourEt, contributingConsultIds: x.contributingConsultIds })),
@@ -75,6 +82,9 @@ function buildView(s: StoreSnapshot): ViewDTO {
     physicians: physicianRows(det.state),
     consults: consultRows(det.state, det.standards, nowMs),
     sample: injectSample(s, d),
+    forecast: forecastFor(s, det.state, fit),
+    standby: { plan: standbyPlanDTO(plan), standbys: standbyDTOs(ctxWithFit, s, plan, d) },
+    policy: policyCatalog(),
   };
 }
 

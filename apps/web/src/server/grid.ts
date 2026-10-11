@@ -25,7 +25,7 @@ export function bucketEdges(nowMs: number, endMs: number): number[] {
 
 const needEnd = (n: Need, horizonEndMs: number) => (n.endMs === 'beyond_horizon' ? horizonEndMs : n.endMs);
 
-export function buildGrid(decision: DecisionReport): CoverageGridDTO {
+export function buildGrid(decision: DecisionReport, pGap?: ReadonlyMap<string, number>): CoverageGridDTO {
   const cov = decision.decisionCoverage;
   const det = decision.detection;
   const nowMs = decision.nowMs;
@@ -58,6 +58,8 @@ export function buildGrid(decision: DecisionReport): CoverageGridDTO {
         expectedIds: at?.expectedIds ?? [],
         staffedIds: at?.staffedIds ?? [],
         needIds: overlapping.map((n) => n.id),
+        // Standby gap grid cells are quarter-hour aligned like these buckets (D-90 4.1); the first partial bucket has no cell.
+        pGap: pGap?.get(`${h.hospitalId}|${b.startMs}`) ?? null,
       };
     });
     const worst = cells.reduce<CellClass>((w, c) => (RANK[c.class] > RANK[w] ? c.class : w), 'OK');

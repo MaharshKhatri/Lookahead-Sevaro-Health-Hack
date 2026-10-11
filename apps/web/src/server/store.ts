@@ -20,6 +20,7 @@ import {
 import { MAPPING_FILE, ingestDir } from '@lookahead/engine/loaders';
 import type { ClockMode, ClockSpeed } from '@/lib/dto';
 import { archiveLog } from './archive';
+import { actContext } from './forecast';
 import { Mutex } from './mutex';
 import { dataDir, liveDir } from './paths';
 import { backendFromEnv, type InjectedRow, type Repos, type StoreBackend } from './repo';
@@ -181,7 +182,8 @@ export class Store {
   command(command: Command): Promise<CommandResult & { readonly seq: number }> {
     return this.mutex.run(async () => {
       for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt++) {
-        const r = applyCommand({ dataset: this.dataset }, this.log, command, this.clock.nowMs);
+        // Standby commands plan on the surge forecast; the fit memoized for this dataset version and minute keeps the engine pure and the command cheap (Phase 7).
+        const r = applyCommand(actContext(this.dataset, this.bootId, this.datasetVersion, this.clock.nowMs), this.log, command, this.clock.nowMs);
         if (!r.ok || r.replayed || r.emitted.length === 0) return { ...r, seq: headSeq(this.log) };
         const w = await this.repos.actions.append(headSeq(this.log), r.emitted);
         if (w.ok) {
@@ -381,7 +383,7 @@ export class Store {
     for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt++) {
       const head = this.log.at(-1);
       if (head !== undefined && this.clock.nowMs < head.atMs) return;
-      const r = applyCommand({ dataset: this.dataset }, this.log, { type: 'tick', commandId: `tick@${this.clock.nowMs}`, actor: SIM_CLOCK }, this.clock.nowMs);
+      const r = applyCommand(actContext(this.dataset, this.bootId, this.datasetVersion, this.clock.nowMs), this.log, { type: 'tick', commandId: `tick@${this.clock.nowMs}`, actor: SIM_CLOCK }, this.clock.nowMs);
       if (!r.ok || r.replayed || r.emitted.length === 0) return;
       const w = await this.repos.actions.append(headSeq(this.log), r.emitted);
       if (w.ok) {

@@ -4,7 +4,22 @@
  * Type-only imports from the engine (erased at build), so this file is safe
  * in client components.
  */
-import type { CoverageEffect, FrozenLedgerRow, FrozenNeed, Need, OfferStatus, PrioritySnapshotRow } from '@lookahead/engine';
+import type {
+  ActivationTrigger,
+  CoverageEffect,
+  FrozenLedgerRow,
+  FrozenNeed,
+  FrozenStandbyRow,
+  HospitalForecast,
+  HospitalRisk,
+  Need,
+  OfferStatus,
+  PrioritySnapshotRow,
+  StandbyCandidate,
+  StandbySelection,
+  StandbyStatus,
+  SurgeForecast,
+} from '@lookahead/engine';
 
 export type UiRole = 'coordinator' | 'clinical_lead' | 'physician';
 export type ClockMode = 'paused' | 'playing';
@@ -56,6 +71,8 @@ export interface CoverageCellDTO {
   readonly expectedIds: readonly string[];
   readonly staffedIds: readonly string[];
   readonly needIds: readonly string[];
+  /** Standby gap grid P(gap) for the cell starting at this bucket (D-90 4.1); null when no cell aligns (first partial bucket, beyond +180). */
+  readonly pGap?: number | null;
 }
 
 export interface CoverageRowDTO {
@@ -326,6 +343,162 @@ export interface DatasetInfoDTO {
   readonly store: string;
 }
 
+// ------------------------------------------------------------------ Phase 7: forecast, standby, policy
+
+/** The engine's HospitalForecast plus observed consult_received counts per 15-min bucket over the last 180 min (radar history bars). */
+export type HospitalForecastDTO = HospitalForecast & { readonly past: readonly { readonly startMs: number; readonly count: number }[] };
+
+export interface SurgeForecastDTO {
+  readonly schemaVersion: SurgeForecast['schemaVersion'];
+  readonly asOfMs: number;
+  readonly dayStartMs: number;
+  readonly params: SurgeForecast['params'];
+  readonly pastBucketMin: number;
+  readonly pastWindowMin: number;
+  readonly hospitals: readonly HospitalForecastDTO[];
+}
+
+export interface StandbyCellDTO {
+  readonly startMs: number;
+  readonly pGap: number;
+  readonly pSpike: number;
+  readonly existingClass: CellClass;
+  readonly supply: number;
+  readonly requiredBase: number;
+  readonly coverableByOne: boolean;
+}
+
+export type StandbyHospitalDTO = HospitalRisk & { readonly cells: readonly StandbyCellDTO[] };
+
+export interface StandbyPlanDTO {
+  readonly schemaVersion: string;
+  readonly asOfMs: number;
+  readonly horizonEndMs: number;
+  readonly cellStarts: readonly number[];
+  readonly hospitals: readonly StandbyHospitalDTO[];
+  readonly candidates: readonly StandbyCandidate[];
+  readonly selected: readonly StandbySelection[];
+  readonly totals: { readonly totalEUM: number; readonly totalWeightedEUM: number; readonly expectedEUMAvoided: number; readonly residualEUM: number; readonly falseAlarmChance: number | null };
+  readonly emptyBenchHospitals: readonly { readonly hospitalId: string; readonly hospitalName: string; readonly maxPGap: number; readonly why: string }[];
+  readonly why: readonly string[];
+}
+
+export interface StandbyActivationDTO {
+  readonly status: 'proposed' | 'approved' | 'sent' | 'delivered' | 'activated' | 'declined' | 'expired' | 'rejected';
+  readonly trigger: ActivationTrigger;
+  readonly logOnByMs: number;
+  readonly endMs: number;
+  readonly scopeHospitalIds: readonly string[];
+  readonly seededConsultCount: number;
+  readonly trapWhy: readonly string[];
+  readonly message: string;
+  readonly proposedAtMs: number;
+  readonly expiresAtMs: number | null;
+  readonly msUntilExpiry: number | null;
+  readonly effectiveStartMs: number | null;
+  readonly coverageEffect: CoverageEffect | null;
+  readonly rejectedReason: string | null;
+}
+
+/** One standby record folded from the action log (D-90 4.4). */
+export interface StandbyDTO {
+  readonly standbyId: string;
+  readonly physicianId: string;
+  readonly name: string;
+  readonly status: StandbyStatus;
+  readonly channel: string;
+  readonly window: { readonly startMs: number; readonly endMs: number; readonly minutes: number };
+  readonly minutesToOnline: number;
+  readonly coveredHospitalIds: readonly string[];
+  readonly hospitalNames: readonly string[];
+  readonly pAccept: number;
+  readonly valueEUM: number;
+  readonly falseAlarmChance: number;
+  readonly message: string;
+  readonly planWhy: readonly string[];
+  readonly candidates: readonly FrozenStandbyRow[];
+  readonly proposedAtMs: number;
+  readonly proposedBy: string;
+  readonly approvedAtMs: number | null;
+  readonly approvedBy: string | null;
+  readonly acknowledgedAtMs: number | null;
+  readonly prealertExpiresAtMs: number | null;
+  readonly msUntilExpiry: number | null;
+  readonly activation: StandbyActivationDTO | null;
+  /** Engine activation trigger on the current plan (null: not recommended). */
+  readonly activationRecommended: ActivationTrigger | null;
+  /** Stand-down recommended (quiet now and 5 min earlier, OQ-51). */
+  readonly standDownRecommended: boolean;
+  readonly quietNow: boolean;
+  readonly outcome: { readonly status: string; readonly atMs: number | null; readonly by: string | null; readonly detail: string } | null;
+  readonly allowedActions: Readonly<Record<string, readonly string[]>>;
+  /** Path of the physician's phone view (/standby/<id>?t=<token>). */
+  readonly standbyPath: string;
+}
+
+export interface PolicyEntryDTO {
+  readonly section: string;
+  readonly name: string;
+  readonly value: string;
+  /** 'BRIEF §…' or 'LOOKAHEAD-DEFINED (illustrative)' (doc-comment wording). */
+  readonly source: string;
+  readonly note: string;
+}
+
+/** Physician phone view of a standby (GET /api/standby/:id): PHI-safe fields only. */
+export interface PublicStandbyDTO {
+  readonly standbyId: string;
+  readonly physicianId: string;
+  readonly status: StandbyStatus;
+  readonly nowMs: number;
+  readonly clockMode: ClockMode;
+  readonly clockSpeed: ClockSpeed;
+  readonly hospitals: readonly string[];
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly minutesToOnline: number;
+  readonly prealertLines: readonly string[] | null;
+  readonly activationLines: readonly string[] | null;
+  readonly releaseLines: readonly string[] | null;
+  readonly logOnByMs: number | null;
+  readonly expiresAtMs: number | null;
+  readonly msUntilExpiry: number | null;
+  readonly canRespond: boolean;
+  /** Which response set is open: the pre-alert (ready / not tonight) or the activation (accept / decline). */
+  readonly respond: 'standby' | 'activation' | null;
+  readonly headline: string;
+  readonly reason: string | null;
+}
+
+/** /rewind contract (engine `rewind(dataset, nowMs)`); the route returns 503 NOT_READY when the engine does not export it. */
+export interface RewindReportDTO {
+  readonly schemaVersion: string;
+  readonly fromMs: number;
+  readonly toMs: number;
+  readonly stepMin: number;
+  readonly assumptions: { readonly leadApprovalMin: number; readonly ackMin: number; readonly activationApprovalMin: number; readonly acceptMin: number; readonly note: string };
+  readonly origins: readonly {
+    readonly tMs: number;
+    readonly pSpikeByHospital: Readonly<Record<string, number>>;
+    readonly pGapByHospital: Readonly<Record<string, number>>;
+    readonly ruleTripped: boolean;
+    readonly recommendedPreAlert: readonly string[];
+    readonly activationRecommended: boolean;
+    readonly deadlocks: readonly string[];
+  }[];
+  readonly firstActions: { readonly hospitalId: string; readonly physicianId: string; readonly preAlertAtMs: number; readonly ackAtMs: number; readonly activationRecommendedAtMs: number | null; readonly activationAcceptedAtMs: number | null; readonly onlineAtMs: number | null } | null;
+  readonly markers: readonly { readonly kind: 'rule_tripped' | 'pre_alert' | 'activation' | 'online' | 'first_routing_failure' | 'deadlock'; readonly tMs: number; readonly hospitalId?: string; readonly physicianId?: string; readonly detail: string }[];
+  readonly lines: readonly {
+    readonly kind: 'actual' | 'reactive' | 'anticipatory';
+    readonly label: string;
+    readonly totalStrokeMinutesUnassigned: number;
+    readonly perConsult: readonly { readonly consultId: string; readonly hospitalId: string; readonly receivedMs: number; readonly assignedMs: number | null; readonly minutesUnassigned: number; readonly assignedTo: string | null }[];
+  }[];
+  readonly explanation: readonly string[];
+  /** Hospital names for the page (joined by the route from the dataset). */
+  readonly hospitalNames?: Readonly<Record<string, string>>;
+}
+
 export interface ViewDTO {
   readonly bootId: string;
   readonly dataset: DatasetInfoDTO;
@@ -360,6 +533,12 @@ export interface ViewDTO {
   readonly physicians: readonly PhysicianRowDTO[];
   readonly consults: readonly ConsultRowDTO[];
   readonly sample: InjectSampleDTO;
+  /** Surge forecast at the sim clock (D-85), fit memoized per dataset version and minute. */
+  readonly forecast: SurgeForecastDTO;
+  /** Standby network: the engine's plan and every standby folded from the log (D-90). */
+  readonly standby: { readonly plan: StandbyPlanDTO; readonly standbys: readonly StandbyDTO[] };
+  /** Read-only policy catalog (every FORECAST_/HAWKES_/STROKE_SHARE_/STANDBY_/REWIND_ constant plus brief limits). */
+  readonly policy: readonly PolicyEntryDTO[];
   /** QR (SVG markup) per delivered offer, for the current request's origin. */
   readonly qr?: Readonly<Record<string, { readonly url: string; readonly svg: string }>>;
 }

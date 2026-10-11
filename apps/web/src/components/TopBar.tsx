@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import type { UiRole } from '@/lib/dto';
+import { sessionRoles, type SessionRole } from './live';
 import { etHm, etHms } from '@/lib/format';
 import { useLive } from './live';
 import { Button, Toasts, cx } from './ui';
@@ -24,22 +25,29 @@ const LINKS = [
   { href: '/admin/dataset', label: 'Dataset' },
 ];
 
-/** Switching the console to Clinical lead needs the lead PIN (OQ-44); the server sets an HttpOnly cookie. */
-export function PinPrompt({ onDone, onCancel }: { readonly onDone: () => void; readonly onCancel: () => void }) {
+/**
+ * Switching the console to a role needs that role's PIN (OQ-44, D-91): the
+ * clinical lead always; the coordinator only when DEMO_MODE is off. The server
+ * sets an HttpOnly session cookie (POST /api/auth/session).
+ */
+const ROLE_LABEL: Record<SessionRole, string> = { coordinator: 'Coordinator', clinical_lead: 'Clinical lead', admin: 'Admin' };
+
+export function PinPrompt({ role = 'clinical_lead', onDone, onCancel }: { readonly role?: SessionRole; readonly onDone: () => void; readonly onCancel: () => void }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const label = ROLE_LABEL[role];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/70" role="dialog" aria-modal="true" aria-label="Clinical lead PIN">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/70" role="dialog" aria-modal="true" aria-label={`${label} PIN`}>
       <form
         className="w-[360px] rounded-xl border border-border bg-panel p-5 shadow-2xl"
         onSubmit={(e) => {
           e.preventDefault();
-          void fetch('/api/auth/lead', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) }).then((r) => (r.ok ? onDone() : setError('Wrong PIN.')));
+          void fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role, pin }) }).then((r) => (r.ok ? onDone() : setError(r.status === 429 ? 'Too many attempts; wait a minute.' : 'Wrong PIN.')));
         }}
       >
-        <div className="text-[13px] font-semibold uppercase tracking-wider text-accent">Clinical lead</div>
-        <div className="mt-1 text-[18px] font-semibold">Enter the lead PIN</div>
-        <input data-testid="console-pin" autoFocus inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} className="num mt-3 w-full rounded-md border border-border bg-bg p-2 text-[20px] tracking-[0.3em]" aria-label="Lead PIN" />
+        <div className="text-[13px] font-semibold uppercase tracking-wider text-accent">{label}</div>
+        <div className="mt-1 text-[18px] font-semibold">Enter the {role === 'clinical_lead' ? 'lead' : label.toLowerCase()} PIN</div>
+        <input data-testid="console-pin" autoFocus inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} className="num mt-3 w-full rounded-md border border-border bg-bg p-2 text-[20px] tracking-[0.3em]" aria-label={`${label} PIN`} />
         {error !== null && <p className="mt-2 text-[14px] text-critical">{error}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <Button tone="muted" onClick={onCancel}>
@@ -57,12 +65,11 @@ export function PinPrompt({ onDone, onCancel }: { readonly onDone: () => void; r
 export function TopBar() {
   const { view, sse, role, setRole, clock, toasts, dismiss } = useLive();
   const path = usePathname();
-  const [pinFor, setPinFor] = useState(false);
+  const [pinFor, setPinFor] = useState<SessionRole | null>(null);
   const chooseRole = (r: UiRole) => {
-    if (r !== 'clinical_lead') return setRole(r);
-    void fetch('/api/auth/lead', { cache: 'no-store' })
-      .then((x) => x.json() as Promise<{ lead?: boolean }>)
-      .then((b) => (b.lead === true ? setRole(r) : setPinFor(true)));
+    if (r === 'physician') return setRole(r);
+    // The coordinator needs no PIN in DEMO_MODE; the clinical lead always does (OQ-44, D-91).
+    void sessionRoles().then((s) => ((r === 'coordinator' && s.demoMode) || s.roles.includes(r) ? setRole(r) : setPinFor(r)));
   };
   const c = view?.clock;
   const playing = c?.mode === 'playing';
@@ -170,13 +177,15 @@ export function TopBar() {
           </Link>
         </div>
       )}
-      {pinFor && (
+      {pinFor !== null && (
         <PinPrompt
+          role={pinFor}
           onDone={() => {
-            setPinFor(false);
-            setRole('clinical_lead');
+            const r = pinFor;
+            setPinFor(null);
+            if (r === 'coordinator' || r === 'clinical_lead') setRole(r);
           }}
-          onCancel={() => setPinFor(false)}
+          onCancel={() => setPinFor(null)}
         />
       )}
       <Toasts toasts={toasts} dismiss={dismiss} />

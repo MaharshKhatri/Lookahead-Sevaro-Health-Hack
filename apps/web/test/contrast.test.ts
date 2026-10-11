@@ -30,7 +30,7 @@ describe('design tokens', () => {
 
   it('globals.css matches tokens.ts in both themes', () => {
     const night = block(/@theme\s*\{/);
-    const day = block(/html\[data-theme='day'\]\s*\{/);
+    const day = block(/html\[data-theme='day'\][^{]*\{/);
     for (const [key, name] of Object.entries(CSS_NAME) as [keyof Palette, string][]) {
       expect(night, `night --color-${name}`).toContain(`--color-${name}: ${THEMES.night[key]};`);
       expect(day, `day --color-${name}`).toContain(`--color-${name}: ${THEMES.day[key]};`);

@@ -29,7 +29,8 @@ html {
 }
 
 /* Day theme (UI pass): same semantic names, light surfaces; values mirror src/ui/tokens.ts THEMES.day. */
-html[data-theme='day'] {
+html[data-theme='day'],
+.theme-day {
   color-scheme: light;
   --color-bg: #f4f6f9;
   --color-panel: #ffffff;

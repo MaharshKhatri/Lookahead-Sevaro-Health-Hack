@@ -32,7 +32,8 @@ function compactCoverage(c: CoverageProjection) {
  * re-derivable from the frozen routes, counts, stage histories and tuples.
  */
 export function freezeDecision(d: DecisionReport): unknown {
-  const { routability: _r, ...detection } = d.detection;
+  const { routability, ...detection } = d.detection;
+  void routability; // dropped from the fixture (bulk; re-derivable)
   const consults = Object.fromEntries(Object.entries(detection.state.consults).map(([k, c]) => [k, { ...c, events: c.events.length }]));
   const out = {
     ...d,

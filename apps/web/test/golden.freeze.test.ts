@@ -17,8 +17,10 @@ const FILE = fileURLToPath(new URL('./golden/view_1820.json', import.meta.url));
 
 /** Per-process and per-host values are not part of the frozen contract. */
 function frozenView(v: ViewDTO): unknown {
-  const { bootId: _b, qr: _q, ...rest } = v;
-  return JSON.parse(JSON.stringify({ ...rest, dataset: { ...rest.dataset, store: undefined } }));
+  const { bootId, qr, ...rest } = v;
+  void bootId;
+  void qr;
+  return JSON.parse(JSON.stringify({ ...rest, dataset: { ...v.dataset, store: undefined } }));
 }
 
 beforeAll(async () => {

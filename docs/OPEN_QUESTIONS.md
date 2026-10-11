@@ -404,3 +404,8 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** silent. It covers late events ("Events can arrive late. Every event carries both event_time and ingested_at"), not a feed that goes quiet. Gaps of tens of seconds between events are normal in the package.
 - **Default:** the console's "No new Sevaro events since HH:MM:SS" banner appears only when the sim clock is more than `QUIET_FEED_BANNER_MS` (120 000 ms, 2 min) past the last ingested event. This supersedes the Session 6 rule (any gap). At 18:20:00 the last event is 17 s old: no banner. After **Jump 19:00**: banner.
 - **Verify:** `apps/web/test/routes.test.ts` ("OQ-46: the quiet-feed banner …").
+
+### OQ-47 Forecasting the brief's spike condition at a future instant
+- **Brief:** Detect must cover "what will need attention in the next 60-90 minutes"; a spike is "trailing 60-minute consults above the hospital's p90 baseline for that hour". The brief defines the spike only at the present instant.
+- **Default:** P(spike at T) = P(known arrivals in (T-60, t] + future arrivals in (max(t, T-60), T] > p90(hour(T))), with the future arrivals from the Surge Forecast's predictive count (D-85). At T = t this is the detector's flag exactly (tested at every 5-min asOf across the day). Constants: `FORECAST_*`, `HAWKES_*`, `STROKE_SHARE_PRIOR_WEIGHT` in `policy.ts`, all LOOKAHEAD-DEFINED (illustrative).
+- **Verify:** `packages/engine/test/forecast.test.ts`; the backtest in docs/FORECAST_BACKTEST.md reports calibration honestly on the one synthetic day.

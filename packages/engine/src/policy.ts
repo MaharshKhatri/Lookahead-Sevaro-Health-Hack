@@ -381,3 +381,36 @@ export const FILE_KIND_MIN_HEADER_SCORE = 0.6;
  * gap between events is not a stale feed).
  */
 export const QUIET_FEED_BANNER_MS = 120_000;
+
+// ---------------------------------------------------------------- Surge forecast (Phase 2)
+// Every constant below is LOOKAHEAD-DEFINED (illustrative) unless marked BRIEF: the brief asks
+// Detect to cover "what will need attention in the next 60-90 minutes" and defines the spike
+// test (trailing 60-minute consults above the hospital's p90 for that hour); the forecast
+// model class and its priors are ours. See docs/FORECAST.md and the Policy panel.
+
+/** LOOKAHEAD-DEFINED (illustrative): forecast output schema version. */
+export const FORECAST_SCHEMA_VERSION = '1.0';
+/** LOOKAHEAD-DEFINED (illustrative): prior weight A of the network day-rate multiplier m_net = (A + N_net) / (A + Lambda0_net): ~20 expected consults of prior. */
+export const FORECAST_DAY_RATE_PRIOR_A = 20;
+/** LOOKAHEAD-DEFINED (illustrative): per-hospital Gamma prior weight B (shape B*m_net, rate B): ~6 expected consults of prior per hospital. */
+export const FORECAST_HOSPITAL_PRIOR_B = 6;
+/** LOOKAHEAD-DEFINED (illustrative): the last 60 min of arrivals belong to the self-excitation term, not the day-rate estimate (matches the brief's trailing-60 spike window). */
+export const FORECAST_DAY_RATE_LAG_MIN = 60;
+/** LOOKAHEAD-DEFINED (illustrative): Hawkes branching-ratio grid eta in {0, 0.05, ..., 0.60}; ties go to the smaller eta. */
+export const HAWKES_ETA_GRID: readonly number[] = Array.from({ length: 13 }, (_, i) => Math.round(i * 5) / 100);
+/** LOOKAHEAD-DEFINED (illustrative): Hawkes kernel half-life grid in minutes; ties go to the shorter half-life. */
+export const HAWKES_HALF_LIFE_GRID_MIN: readonly number[] = [10, 15, 20, 30, 45, 60, 90];
+/** LOOKAHEAD-DEFINED (illustrative): intensity floor inside the log-likelihood so an arrival in an hour with zero baseline is not -infinity. */
+export const FORECAST_INTENSITY_FLOOR = 1e-9;
+/** LOOKAHEAD-DEFINED (illustrative): count PMFs are truncated at this count and renormalized; the dropped tail must stay below FORECAST_TAIL_TOLERANCE. */
+export const FORECAST_N_MAX = 40;
+export const FORECAST_TAIL_TOLERANCE = 1e-6;
+/** BRIEF (Detect: "next 60-90 minutes") + LOOKAHEAD-DEFINED (illustrative) extension to 120: forecast horizons in minutes. */
+export const FORECAST_HORIZONS_MIN: readonly number[] = [30, 60, 90, 120];
+/** LOOKAHEAD-DEFINED (illustrative): spike-probability checkpoints every 15 min out to +180 (the standby planning horizon). */
+export const FORECAST_CHECKPOINT_STEP_MIN = 15;
+export const FORECAST_CHECKPOINT_HORIZON_MIN = 180;
+/** LOOKAHEAD-DEFINED (illustrative): Beta prior weight on the network stroke share when thinning a hospital's forecast to stroke consults. */
+export const STROKE_SHARE_PRIOR_WEIGHT = 2;
+/** LOOKAHEAD-DEFINED (illustrative): risk rank looks at the maximum spike probability within this many minutes, then the 60-min expectation. */
+export const FORECAST_RISK_RANK_WINDOW_MIN = 90;

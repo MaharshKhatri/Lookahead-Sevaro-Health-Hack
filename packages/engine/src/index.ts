@@ -28,3 +28,5 @@ export * from './replay';
 export * from './detect';
 export * from './decide';
 export * from './act';
+export * from './forecast';
+export { mulberry32, seedFromString, type Rng } from './util/rng';

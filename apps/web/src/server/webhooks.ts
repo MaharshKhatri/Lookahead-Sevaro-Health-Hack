@@ -43,10 +43,45 @@ export interface WebhookConfig {
   readonly secret: string | null;
 }
 
-export function webhookConfig(env: Readonly<Record<string, string | undefined>> = process.env): WebhookConfig {
+type Env = Readonly<Record<string, string | undefined>>;
+
+/**
+ * Upstream Event Simulator (sprint B1, LOOKAHEAD-DEFINED): SIMULATOR_ENABLED=1
+ * turns it on, SIMULATOR_ENABLED=0 off; unset, it follows DEMO_MODE (on unless
+ * DEMO_MODE=false). Lives here, not in simulator.ts, so the dispatcher can
+ * decide its default target without an import cycle through the store.
+ */
+export const SIMULATOR_ENV = 'SIMULATOR_ENABLED';
+export const SIMULATOR_SINK_PATH = '/api/simulator/webhook-sink';
+
+export function simulatorEnabled(env: Env = process.env): boolean {
+  const v = env[SIMULATOR_ENV];
+  if (v === '1') return true;
+  if (v === '0') return false;
+  return env.DEMO_MODE !== 'false';
+}
+
+/** The dev sink on this server: LOOKAHEAD_PUBLIC_ORIGIN, else http://127.0.0.1:<PORT or 3000> (next start sets PORT from -p). */
+export function simulatorSinkUrl(env: Env = process.env): string {
+  const origin = env.LOOKAHEAD_PUBLIC_ORIGIN;
+  const base = origin !== undefined && /^https?:\/\//.test(origin) ? origin.replace(/\/$/, '') : `http://127.0.0.1:${env.PORT !== undefined && /^\d+$/.test(env.PORT) ? env.PORT : '3000'}`;
+  return `${base}${SIMULATOR_SINK_PATH}`;
+}
+
+/** The dispatcher's default: the dev sink when the simulator is on, no URL is configured and this is not a unit-test process. */
+export const simulatorSinkDefault = (env: Env = process.env): boolean => simulatorEnabled(env) && env.NODE_ENV !== 'test' && env.VITEST === undefined;
+
+/**
+ * `opts.simulatorSink`: when LOOKAHEAD_WEBHOOK_URL is unset (or empty), target
+ * the simulator's dev sink instead of nothing. Explicit, so webhookConfig({})
+ * still means "nothing configured" (url null).
+ */
+export function webhookConfig(env: Env = process.env, opts: { readonly simulatorSink?: boolean } = {}): WebhookConfig {
   const url = env[WEBHOOK_URL_ENV];
   const secret = env[WEBHOOK_SECRET_ENV] ?? env.LOOKAHEAD_INGEST_SECRET;
-  return { url: url === undefined || !/^https?:\/\//.test(url) ? null : url, secret: secret === undefined || secret === '' ? null : secret };
+  const configured = url === undefined || !/^https?:\/\//.test(url) ? null : url;
+  const sink = configured === null && (url === undefined || url === '') && opts.simulatorSink === true ? simulatorSinkUrl(env) : null;
+  return { url: configured ?? sink, secret: secret === undefined || secret === '' ? null : secret };
 }
 
 export function envelopeFor(events: readonly StoreEvent[], bootId: string, sentAtMs: number): WebhookEnvelope {
@@ -116,9 +151,11 @@ export interface Dispatcher {
 
 /**
  * Subscribes to the store and batches its events. Returns null when no URL is
- * configured (the common case: nothing is subscribed, nothing runs).
+ * configured (the common case: nothing is subscribed, nothing runs). With the
+ * simulator enabled and no URL set, the default config targets its dev sink
+ * (sprint B1) so the round trip is visible on /simulator.
  */
-export function startWebhooks(store: Store, cfg: WebhookConfig = webhookConfig(), transport: Transport = defaultTransport, debounceMs = WEBHOOK_DEBOUNCE_MS): Dispatcher | null {
+export function startWebhooks(store: Store, cfg: WebhookConfig = webhookConfig(process.env, { simulatorSink: simulatorSinkDefault() }), transport: Transport = defaultTransport, debounceMs = WEBHOOK_DEBOUNCE_MS): Dispatcher | null {
   if (cfg.url === null) return null;
   let pending: StoreEvent[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;

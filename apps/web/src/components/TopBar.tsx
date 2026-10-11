@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { UiRole } from '@/lib/dto';
 import { sessionRoles, type SessionRole } from './live';
 import { etHm, etHms } from '@/lib/format';
@@ -26,6 +26,40 @@ const LINKS = [
   { href: '/quality', label: 'Quality' },
   { href: '/admin/dataset', label: 'Dataset' },
 ];
+
+/** Upstream Event Simulator status (sprint B1): the chip shows while the simulator posted within this window. */
+const UPSTREAM_WINDOW_MS = 60_000;
+const UPSTREAM_POLL_MS = 10_000;
+
+interface UpstreamStatus {
+  readonly enabled: boolean;
+  readonly connected: boolean;
+}
+
+/** Polls GET /api/simulator/status every 10 s and whenever the store version changes (SSE). */
+function useUpstreamStatus(version: number | undefined): UpstreamStatus {
+  const [st, setSt] = useState<UpstreamStatus>({ enabled: false, connected: false });
+  useEffect(() => {
+    let stopped = false;
+    const load = () =>
+      fetch('/api/simulator/status', { cache: 'no-store' })
+        .then(async (r) => {
+          if (!r.ok || stopped) return;
+          const j = (await r.json()) as { enabled?: boolean; lastSentAtMs?: number | null; nowMs?: number };
+          const last = typeof j.lastSentAtMs === 'number' ? j.lastSentAtMs : null;
+          const now = typeof j.nowMs === 'number' ? j.nowMs : Date.now();
+          setSt({ enabled: j.enabled === true, connected: j.enabled === true && last !== null && now - last <= UPSTREAM_WINDOW_MS });
+        })
+        .catch(() => {});
+    void load();
+    const t = setInterval(() => void load(), UPSTREAM_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [version]);
+  return st;
+}
 
 /**
  * Switching the console to a role needs that role's PIN (OQ-44, D-91): the
@@ -73,6 +107,7 @@ export function TopBar() {
     // The coordinator needs no PIN in DEMO_MODE; the clinical lead always does (OQ-44, D-91).
     void sessionRoles().then((s) => ((r === 'coordinator' && s.demoMode) || s.roles.includes(r) ? setRole(r) : setPinFor(r)));
   };
+  const upstream = useUpstreamStatus(view?.version);
   const c = view?.clock;
   const playing = c?.mode === 'playing';
   const snapLabel = c === undefined ? '18:20' : etHm(c.snapshotMs);
@@ -140,6 +175,11 @@ export function TopBar() {
               {l.label}
             </Link>
           ))}
+          {upstream.enabled && (
+            <Link href="/simulator" data-testid="nav-simulator" className={cx('rounded px-2 py-1 text-[14px]', path === '/simulator' ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
+              Simulator
+            </Link>
+          )}
         </nav>
 
         <label className="flex items-center gap-2 text-[13px] text-muted">
@@ -154,6 +194,12 @@ export function TopBar() {
             <option value="clinical_lead">Clinical lead</option>
           </select>
         </label>
+
+        {upstream.connected && (
+          <Link href="/simulator" data-testid="upstream-chip" title="The upstream event simulator posted a row within the last 60 s" className="rounded border border-ok/50 bg-ok/15 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-ok whitespace-nowrap">
+            Upstream connected
+          </Link>
+        )}
 
         <span className="flex items-center gap-1.5 text-[12px] text-muted" title={`Live updates (SSE): ${sse}`} data-testid="sse-status" data-status={sse}>
           <span className={cx('inline-block h-2.5 w-2.5 rounded-full', sse === 'open' ? 'bg-ok' : sse === 'connecting' ? 'bg-info' : 'bg-warning')} />

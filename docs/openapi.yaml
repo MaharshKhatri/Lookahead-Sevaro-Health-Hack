@@ -335,6 +335,37 @@ paths:
       responses:
         '200': { description: Reverted., content: { application/json: { schema: { type: object } } } }
         '409': { $ref: '#/components/responses/Error' }
+  /api/simulator/send:
+    post:
+      tags: [admin]
+      summary: 'Demo only (SIMULATOR_ENABLED=1, on by default in DEMO_MODE): build one event row from the live snapshot, sign it server-side when LOOKAHEAD_INGEST_SECRET is set, post it through POST /api/v1/events.'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [kind], properties: { kind: { type: string, enum: [stroke_consult, physician_status, camera_active, heartbeat_lost, note_signed, routing_failed, duplicate, late] }, hospitalId: { type: string }, physicianId: { type: string }, status: { type: string } } } } }
+      responses:
+        '200': { description: '{sentAtMs, payload, signatureHeader, status, report (IngestReport), latencyMs, version}.', content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/simulator/webhook-sink:
+    get:
+      tags: [admin]
+      summary: Demo only. The last 50 webhook deliveries received by the dev sink, newest first.
+      responses:
+        '200': { description: '{entries: [{receivedAtMs, verified, signature, version, body}]}.', content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      summary: Demo only. Dev webhook sink; verifies x-lookahead-signature when a webhook secret is set (a bad signature is stored as verified false and answered 401).
+      responses:
+        '200': { description: Stored., content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/simulator/status:
+    get:
+      tags: [admin]
+      summary: '{enabled, lastSentAtMs, webhookTarget (none | dev_sink | external), nowMs}.'
+      responses:
+        '200': { description: Simulator status., content: { application/json: { schema: { type: object } } } }
 components:
   securitySchemes:
     ingestSignature:

@@ -43,7 +43,7 @@ export interface WebhookConfig {
   readonly secret: string | null;
 }
 
-export function webhookConfig(env: NodeJS.ProcessEnv = process.env): WebhookConfig {
+export function webhookConfig(env: Readonly<Record<string, string | undefined>> = process.env): WebhookConfig {
   const url = env[WEBHOOK_URL_ENV];
   const secret = env[WEBHOOK_SECRET_ENV] ?? env.LOOKAHEAD_INGEST_SECRET;
   return { url: url === undefined || !/^https?:\/\//.test(url) ? null : url, secret: secret === undefined || secret === '' ? null : secret };

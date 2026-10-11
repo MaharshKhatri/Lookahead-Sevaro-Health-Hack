@@ -14,7 +14,8 @@
     "report:detect": "tsx scripts/detect-report.ts",
     "report:decide": "tsx scripts/decide-report.ts",
     "demo:loop": "tsx scripts/demo-loop.ts",
-    "aws:create-table": "tsx scripts/aws/create-table.ts"
+    "aws:create-table": "tsx scripts/aws/create-table.ts",
+    "golden:freeze": "tsx scripts/golden-freeze.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.1149.0",

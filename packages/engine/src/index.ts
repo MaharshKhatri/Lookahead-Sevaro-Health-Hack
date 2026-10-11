@@ -34,3 +34,5 @@ export * from './rewind';
 export * from './incidents';
 export * from './integrate';
 export { mulberry32, seedFromString, type Rng } from './util/rng';
+export * from './clinical';
+export * from './rewind/opener';

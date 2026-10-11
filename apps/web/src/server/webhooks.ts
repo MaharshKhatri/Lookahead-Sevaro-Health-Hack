@@ -63,13 +63,49 @@ export function envelopeFor(events: readonly StoreEvent[], bootId: string, sentA
   };
 }
 
-/** Signs and posts one envelope. Exposed for tests; the dispatcher below calls it. */
+/** One outbound delivery attempt, kept in a ring buffer for the status modal and the simulator (sprint A6/B1). */
+export interface WebhookDelivery {
+  readonly atMs: number;
+  readonly url: string;
+  readonly ok: boolean;
+  readonly status: number;
+  readonly latencyMs: number;
+  readonly version: number;
+  readonly types: readonly string[];
+  readonly error: string | null;
+}
+
+export const DELIVERY_LOG_SIZE = 50;
+const deliveries: WebhookDelivery[] = [];
+
+/** Newest first, at most DELIVERY_LOG_SIZE. */
+export const webhookDeliveries = (): readonly WebhookDelivery[] => deliveries;
+export const lastWebhookDelivery = (): WebhookDelivery | null => deliveries[0] ?? null;
+/** Tests only. */
+export function clearWebhookDeliveries(): void {
+  deliveries.length = 0;
+}
+
+function record(d: WebhookDelivery): void {
+  deliveries.unshift(d);
+  deliveries.length = Math.min(deliveries.length, DELIVERY_LOG_SIZE);
+}
+
+/** Signs and posts one envelope, recording the attempt. Exposed for tests; the dispatcher below calls it. */
 export async function deliver(envelope: WebhookEnvelope, cfg: WebhookConfig, transport: Transport = defaultTransport): Promise<{ readonly ok: boolean; readonly status: number }> {
   if (cfg.url === null) return { ok: false, status: 0 };
   const body = JSON.stringify(envelope);
   const headers: Record<string, string> = { 'content-type': 'application/json', 'user-agent': 'lookahead-webhook/1.0' };
   if (cfg.secret !== null) headers['x-lookahead-signature'] = signBody(cfg.secret, body);
-  return transport(cfg.url, { method: 'POST', headers, body });
+  const started = Date.now();
+  try {
+    const r = await transport(cfg.url, { method: 'POST', headers, body });
+    record({ atMs: Date.now(), url: cfg.url, ok: r.ok, status: r.status, latencyMs: Date.now() - started, version: envelope.version, types: envelope.types, error: null });
+    return r;
+  } catch (e) {
+    record({ atMs: Date.now(), url: cfg.url, ok: false, status: 0, latencyMs: Date.now() - started, version: envelope.version, types: envelope.types, error: e instanceof Error ? e.message : String(e) });
+    throw e;
+  }
 }
 
 export interface Dispatcher {

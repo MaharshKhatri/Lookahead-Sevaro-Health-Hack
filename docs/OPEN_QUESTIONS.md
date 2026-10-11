@@ -409,3 +409,23 @@ Status key: **Open** = unverifiable from the data, ask Sevaro if possible. **Sup
 - **Brief:** Detect must cover "what will need attention in the next 60-90 minutes"; a spike is "trailing 60-minute consults above the hospital's p90 baseline for that hour". The brief defines the spike only at the present instant.
 - **Default:** P(spike at T) = P(known arrivals in (T-60, t] + future arrivals in (max(t, T-60), T] > p90(hour(T))), with the future arrivals from the Surge Forecast's predictive count (D-85). At T = t this is the detector's flag exactly (tested at every 5-min asOf across the day). Constants: `FORECAST_*`, `HAWKES_*`, `STROKE_SHARE_PRIOR_WEIGHT` in `policy.ts`, all LOOKAHEAD-DEFINED (illustrative).
 - **Verify:** `packages/engine/test/forecast.test.ts`; the backtest in docs/FORECAST_BACKTEST.md reports calibration honestly on the one synthetic day.
+
+### OQ-48 Do standby pre-alerts count toward "3 offers per physician per week"?
+- **Brief:** "No more than one open offer per physician, and no more than 3 offers per physician per week." A pre-alert is not an offer, but it is a message to an off-shift physician.
+- **Default:** conservative: an open standby is the physician's one open offer, and a sent pre-alert counts toward the weekly three (`STANDBY_COUNTS_AS_OFFER = true`). A pre-alert rejected or cancelled before sending does not count.
+- **Verify:** `packages/engine/test/standby.test.ts` (OPEN_OFFER_EXISTS while a standby is open; `offerLogEntries` includes the pre-alert).
+
+### OQ-49 May the clinical lead pre-approve an activation?
+- **Brief:** "Every offer is approved by the clinical lead on duty before it is sent"; "Any message to a physician outside their shift requires a human approval."
+- **Default:** no conditional pre-approval: the pre-alert and the activation are two separate messages, each approved by the lead before it is sent. The activation is proposed only when the trigger holds (or the coordinator forces it with a recorded reason).
+- **Verify:** `standby.test.ts` lifecycle tests.
+
+### OQ-50 Standby hours and the 60-hour cap
+- **Brief:** "Hours worked in the trailing 7 days plus the offered hours do not exceed 60."
+- **Default:** a standby that is never activated adds no hours; eligibility is still checked for the full standby window (the hours the physician might work), and the window end is capped by the remaining headroom. An activated standby's hours count like an accepted offer's.
+- **Verify:** ledger rule 4 via `buildLedger` on the risk needs; `windowOf` in `standby/plan.ts`.
+
+### OQ-51 Activation and release thresholds, hysteresis
+- **Brief:** silent (the standby network is our extension).
+- **Default:** activate when a covered cell has P(gap) >= 0.6 (`STANDBY_ACTIVATE_PGAP`) within time-to-online + 15 min, or a covered hospital is deadlocked now; recommend stand-down when no covered remaining cell has P(gap) >= 0.2 (`STANDBY_RELEASE_PGAP`) at two consecutive 5-min evaluations (`STANDBY_RECOMPUTE_MIN`). The engine is pure, so "two consecutive recomputes" is evaluated as "quiet now and quiet one step earlier" from knowledge-time state.
+- **Verify:** `standby.test.ts` (activation recommended by the deadlock; stand-down not recommended while risk is high).

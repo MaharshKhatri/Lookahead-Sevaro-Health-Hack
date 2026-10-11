@@ -1,48 +1,67 @@
 # Lookahead
 
-Sevaro Challenge 2 (Tele-Neurology Operations Command Center), Rutgers Health Hack 2026.
+Tele-neurology operations command center for Sevaro Challenge 2, Rutgers Health Hack 2026.
 
-Lookahead rebuilds operational state from Sevaro's raw event stream, detects what needs attention now and in the next 60–90 minutes, recommends interventions with rule-by-rule explanations, and runs a human-approved closed loop. See `CLAUDE.md` for the engineering rules and `docs/` for the brief, data profile, open questions and decisions.
+Lookahead rebuilds operational state from Sevaro's raw event stream. It detects what needs attention now and over the next three hours, forecasts surges, pre-positions standby neurologists, and recommends interventions (reassign, escalate, split-shift offer, standby pre-alert) with rule-by-rule explanations. Every intervention runs through a human-approved closed loop: the coordinator proposes, the clinical lead approves, and the off-shift physician answers on a phone. **AI narrates. Humans decide.** A language model may only narrate engine-computed facts, behind a fidelity guard; it never chooses a physician, sends a message or changes state.
+
+The brief is `docs/brief_c2.md`. Engineering rules are in `CLAUDE.md`, decisions in `docs/DECISIONS.md`, open questions with their defaults in `docs/OPEN_QUESTIONS.md`, and the brief-to-code map in `docs/REQUIREMENTS_TRACE.md`.
+
+## What's new (final build, 2026-10-11)
+
+- **Opener** (`/opener`, or `/?opener=1` over the console): the single most impactful episode from the rewind, in three computed sentences, with a timeline and the latency assumptions it used.
+- **Patient clock** on every page: the longest-waiting unassigned stroke consult, ranked first by whether any credentialed physician can take it now, with elapsed time on the sim clock and a neuron-loss estimate (Saver 2006, labelled as an extrapolation).
+- **Clinical impact on `/rewind`**: stroke consult-minutes averted by anticipation, extrapolated to neurons, synapses and brain aging, with the sources and the 1:1 assumption on `/clinical-sources`.
+- **`/architecture`**: what AI does and never does, the decision pipeline, live counters from the audit log (decisions made by AI: computed, not typed), the hard-coded-ID scan and the last real test run, and a live x20 scale test.
+- **Stress Test** drawer in the console: "prove it" (late event, duplicate flood, deadlock and recovery, trap proof, generalization on an isolated dataset, deterministic forecast hashes, PHI audit) and "break it" (declines, a second stroke, heartbeat loss, status flaps, an uncovered stroke, seeded chaos), each through the real ingest and command paths and recorded in the audit log.
+- **Upstream Event Simulator** (`/simulator`): signed event pushes into `POST /api/v1/events` and a dev webhook sink, with per-event timing.
+- **Status line**: `/api/health` checks DynamoDB and Bedrock with fast timeouts; green "Live on AWS" only when both answer.
+- **Integration API**: `POST /api/v1/events` (HMAC-signed, idempotent), `GET /api/v1/{forecast,standby,coverage,alerts,incidents}`, signed outbound webhooks, `/embed/surge`, `docs/openapi.yaml` checked against the route files.
+- **Design system**: Night and Day themes with a WCAG contrast test, a component kit, the Horizon Line (now − 30 to now + 180 min), a detail column, the ⌘K command palette and a shortcut sheet (`?`). Living style guide at `/design`; plan in `docs/DESIGN.md`.
+
+## Quick start
 
 ```sh
 pnpm install
-pnpm typecheck && pnpm test   # gate (engine + web route tests)
-pnpm lint
-pnpm recon                    # regenerates docs/DATA_PROFILE.md from data/raw
+pnpm typecheck && pnpm test        # engine + web unit and route tests
+pnpm --filter web dev              # http://localhost:3000
+pnpm --filter web build && pnpm --filter web start
+pnpm --filter web e2e              # build + Playwright
+pnpm final-check                   # every automated pre-judging check, fails loudly on any red
 ```
 
-## Command Center (apps/web)
+Docker: `docker build -t lookahead . && docker run -p 3000:3000 --env-file .env lookahead` (see `Dockerfile`, `docker-compose.yml`, `.env.example`).
 
-```sh
-pnpm --filter web dev                              # http://localhost:3000
-pnpm --filter web build && pnpm --filter web start # production build
-pnpm --filter web e2e                              # build + Playwright (chromium)
-pnpm --filter web screens                          # build + screenshots into docs/screens/
-```
+Demo defaults (change them for anything but a demo): `DEMO_MODE=true` lets anyone act as the coordinator; the clinical lead PIN is `LEAD_PIN` (default `2026`) in every mode; physician links carry an HMAC token.
 
-- `/` Command Center (projector): NOW (ranked attention), NEXT 2 HOURS (coverage grid), ACT (recommendation, ledger, trap, what-if, offers).
-- `/state` physicians and consults as separate models; `/integrity` replay vs reference snapshot and the late-event story; `/inject` live test rows; `/audit/[offerId]`.
-- Phones: `/lead` (clinical lead approvals) and `/offer/[id]` (off-shift physician).
-- `/admin/dataset`: upload a different data package (CSVs or a .zip). It shows the ingest report (how each header was matched, missing columns with suggestions, row errors with line numbers) and the snapshot check (x/8, y/18). You can apply header-mapping overrides, then **Activate** (lead PIN) and **Revert**.
-- Demo state lives in `data/live/<dataset-key>/*.jsonl` (replayed on restart). **Reset 18:20** in the top bar clears it.
-- Set `LOOKAHEAD_PUBLIC_ORIGIN=http://<LAN-IP>:3000` so the offer QR code opens on a phone.
-- The lead PIN is `LEAD_PIN` (default `2026`). Physician links carry a signed token (`/offer/<id>?t=…`, `OFFER_LINK_SECRET`).
-- **Explain** buttons give a 2–3 sentence briefing of engine facts. When AWS credentials allow Bedrock, Claude writes it and a fidelity guard checks every number, time and name against the facts ("AI-WRITTEN · VERIFIED"). Otherwise the deterministic template is shown ("TEMPLATE"). LLMs never decide.
+## Pages
 
-The 4-minute walkthrough is in `docs/DEMO_SCRIPT.md`; screenshots in `docs/screens/`; judging-day operations (laptop, EC2, Wi-Fi fallback, reset between groups) in `docs/RUNBOOK.md`.
+| Page | What it shows |
+|---|---|
+| `/` | Command center: Horizon Line, NOW (ranked attention or incidents), coverage grid, surge radar, standby bench, timeline, policy, ACT (next best actions, recommendation, ledger, trap, what-if, offers), Stress Test |
+| `/opener`, `/rewind`, `/clinical-sources` | The day replayed as if Lookahead had been running, and the clinical extrapolation |
+| `/quality` | Forecast backtest against baseline and persistence |
+| `/architecture` | AI narrates, humans decide; live counters; scale test |
+| `/simulator` | Upstream event simulator (demo only) |
+| `/lead`, `/offer/[id]?t=`, `/standby/[id]?t=` | Phones: clinical lead approvals, physician offer and standby |
+| `/state`, `/integrity`, `/inject`, `/audit/[offerId]`, `/admin/dataset`, `/design`, `/embed/surge` | State models, replay integrity, live test rows, audit, dataset swap, style guide, embeddable radar |
+
+## Reports
+
+`pnpm report:detect`, `report:decide`, `report:forecast`, `report:rewind`, `demo:loop`, `scale:bench`, `test:report` regenerate the measured documents in `docs/` (`DETECT_1820.md`, `DECIDE_1820.md`, `FORECAST_BACKTEST.md`, `REWIND.md`, `ACT_LOOP.md`, `SCALE.md`, `test-report.json`). Every number in them, and on every page, is computed by code at run time.
 
 ## AWS (optional; everything degrades to local)
 
 | Env | Effect | Without it |
 | --- | --- | --- |
-| `STORE=dynamo`, `TABLE_NAME`, `AWS_REGION` | Action log + injected events in DynamoDB; conditional writes make a double accept impossible across servers (D-76) | file store in `data/live/` |
-| `BEDROCK_MODEL_ID` (optional), `NARRATION=off` to disable | Claude via Bedrock Converse writes Explain text, verified by the guard | template text |
-| `AUDIT_BUCKET` | audit CSV + action log archived to S3 before each reset or dataset swap | nothing archived |
+| `STORE=dynamo`, `TABLE_NAME`, `AWS_REGION` | Action log and injected events in DynamoDB with conditional writes (D-76) | file store in `data/live/` |
+| `BEDROCK_MODEL_ID`, `BEDROCK_GUARDRAIL_ID`; `NARRATION=off` to disable | Bedrock writes Explain text, checked by the fidelity guard | template text |
+| `AUDIT_BUCKET` | audit CSV and action log archived to S3 before each reset or dataset swap | nothing archived |
+| `DEPLOYED_URL` | shown in the status modal; checked by `pnpm final-check` | not shown |
 
-```sh
-curl -s localhost:3000/api/health                           # {ok, store, bedrock, datasetVersion, clock, ...}
-pnpm aws:create-table --table lookahead-log --region us-east-1
-PLAYWRIGHT_BASE_URL=http://<host> pnpm --filter web e2e:remote   # @demo e2e against a deployed server
-```
+EC2 deployment: `scripts/aws/deploy-ec2.md`. Judging-day operations: `docs/RUNBOOK.md`. Integration: `docs/INTEGRATION.md`. Architecture: `docs/ARCHITECTURE.md`.
 
-EC2 deployment (instance profile, user data, security group, fallbacks): `scripts/aws/deploy-ec2.md`.
+## Limitations
+
+- One synthetic day of data. The forecast backtest (`docs/FORECAST_BACKTEST.md`) does not beat the baseline-only model on count metrics; the clinical numbers are an extrapolation from published averages, not an outcome measurement.
+- The x20 scale benchmark (`docs/SCALE.md`) shows a full uncached recompute well over an interactive budget; the hot spots and unapplied fixes are listed there.
+- No real Synapse, scheduling or messaging adapter: messages are simulated, approvals happen in the `/lead` inbox, and the event API is ours (`docs/INTEGRATION.md`). Shadow mode was not built.

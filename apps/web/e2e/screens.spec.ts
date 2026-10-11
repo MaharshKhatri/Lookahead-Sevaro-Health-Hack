@@ -91,6 +91,40 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await expect(page.getByTestId('attention-top')).toBeVisible();
   await shot(page, '14-command-center-after-inject');
 
+  // Final build: incidents, next best action, surge radar, standby bench, timeline, policy, rewind, quality, standby phone.
+  await page.getByTestId('now-mode-incidents').click();
+  await expect(page.getByTestId('incident-card').first()).toBeVisible();
+  await shot(page, '15-incidents-and-next-actions');
+  await page.getByTestId('tab-radar').click();
+  await expect(page.getByTestId('radar-row').first()).toBeVisible();
+  await shot(page, '16-surge-radar');
+  await page.getByTestId('tab-bench').click();
+  await expect(page.locator('[data-testid=bench-card]').first()).toBeVisible();
+  await shot(page, '17-standby-bench');
+  await page.getByTestId('tab-timeline').click();
+  await expect(page.getByTestId('horizon-timeline')).toBeVisible();
+  await shot(page, '18-horizon-timeline');
+  await page.getByTestId('tab-policy').click();
+  await shot(page, '19-policy-panel');
+  await page.getByTestId('tab-bench').click();
+  await page.locator('[data-testid=bench-card]').first().getByTestId('bench-prealert').click();
+  await phone.goto('/lead');
+  await expect(phone.getByTestId('lead-standby')).toBeVisible();
+  await shot(phone, '20-lead-standby-390');
+  await phone.getByTestId('lead-approve-standby').click();
+  const benchCard = page.locator('[data-testid=bench-card]').first();
+  await expect(benchCard.getByTestId('standby-status')).toHaveText('PRE-ALERT DELIVERED');
+  const sbHref = (await benchCard.getByTestId('standby-link').getAttribute('href')) ?? '';
+  await phone.goto(sbHref);
+  await expect(phone.getByTestId('standby-headline')).toBeVisible();
+  await shot(phone, '21-standby-phone-390');
+  await page.goto('/rewind');
+  await expect(page.getByTestId('rewind')).toBeVisible({ timeout: 30_000 });
+  await shot(page, '22-rewind');
+  await page.goto('/quality');
+  await expect(page.getByTestId('quality-table')).toBeVisible();
+  await shot(page, '23-quality');
+
   // Dataset admin: a package with the brief's own headers ("Event time", "Phys."), not activated.
   const RAW = new URL('../../../data/raw/', import.meta.url);
   const upload = readdirSync(RAW)

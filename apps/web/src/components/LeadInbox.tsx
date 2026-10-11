@@ -184,7 +184,7 @@ function StandbyApproval({ s }: { readonly s: StandbyDTO }) {
           <div className="mt-1 text-[13px] text-muted">log on by {etHm(s.activation.logOnByMs)} ET · scope {s.activation.scopeHospitalIds.join(', ')} · seeded at {s.activation.seededConsultCount} consults (split-shift trap)</div>
         </Section>
       )}
-      <Section title={stage === 'release' ? 'Status' : 'Message to the physician (no patient information)'}>
+      <Section title={stage === 'release' ? 'Status' : 'Message to the physician (hospitals, hours and start time only)'}>
         <pre className="whitespace-pre-wrap font-sans text-[15px]">{text}</pre>
       </Section>
       <div className="mt-4 grid grid-cols-2 gap-2">

@@ -450,3 +450,12 @@ export const STANDBY_COUNTS_AS_OFFER = true;
 /** LOOKAHEAD-DEFINED (illustrative): never pre-alert the same physician twice in one night (fairness guard). */
 export const STANDBY_ONE_PREALERT_PER_NIGHT = true;
 export const STANDBY_SCHEMA_VERSION = '1.0';
+
+// ---------------------------------------------------------------- Rewind (Phase 5)
+/** LOOKAHEAD-DEFINED (illustrative): the rewind replays the day as if Lookahead had been running from this ET wall-clock time, in these steps. */
+export const REWIND_START_SECOND_OF_DAY_ET = 16 * 3600;
+export const REWIND_STEP_MIN = 5;
+/** LOOKAHEAD-DEFINED (illustrative): human latencies assumed in the counterfactual, displayed on /rewind. */
+export const REWIND_LATENCY_MIN = { leadApprovalMin: 2, ackMin: 3, activationApprovalMin: 2, acceptMin: 2 } as const;
+/** LOOKAHEAD-DEFINED (illustrative): unassigned stroke minutes are counted up to the reference instant plus this horizon; beyond the stream's end the actual line assumes a deadlock persists until its first known relief (OQ-32). */
+export const REWIND_EVAL_HORIZON_MIN = 60;

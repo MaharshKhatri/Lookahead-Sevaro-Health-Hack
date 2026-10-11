@@ -16,7 +16,8 @@
     "demo:loop": "tsx scripts/demo-loop.ts",
     "report:forecast": "tsx scripts/forecast-report.ts",
     "aws:create-table": "tsx scripts/aws/create-table.ts",
-    "golden:freeze": "tsx scripts/golden-freeze.ts"
+    "golden:freeze": "tsx scripts/golden-freeze.ts",
+    "report:rewind": "tsx scripts/rewind-report.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.1149.0",

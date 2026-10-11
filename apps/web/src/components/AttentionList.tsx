@@ -178,6 +178,10 @@ export function AttentionList({ items, incidents, reduction }: { readonly items:
         </div>
       }
     >
+      {/* Assertive announcements for P1 only (UI pass accessibility): the top critical headline. */}
+      <div aria-live="assertive" className="sr-only">
+        {items[0]?.severity === 'critical' ? `Critical: ${items[0].headline}` : ''}
+      </div>
       <div className="scroll-thin flex-1 overflow-y-auto">
         {showIncidents ? (
           <IncidentList incidents={incidents} items={items} />

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAtMs": 1791725697448,
+  "command": "pnpm test:report (vitest run, engine + web)",
+  "suites": {
+    "engine": {
+      "files": 59,
+      "tests": 464,
+      "passed": 464,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 41603
+    },
+    "web": {
+      "files": 26,
+      "tests": 177,
+      "passed": 177,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 82127
+    }
+  },
+  "total": {
+    "files": 85,
+    "tests": 641,
+    "passed": 641,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 123730
+  },
+  "ok": true
+}

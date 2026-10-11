@@ -175,7 +175,7 @@ function Assumptions({ a }: { readonly a: OpenerPageDTO['assumptions'] }) {
 export function OpenerContent({ data }: { readonly data: OpenerPageDTO }) {
   const o = data.opener;
   return (
-    <section className="mx-auto w-full max-w-[1000px] px-4 py-8 text-left sm:px-8 sm:py-12" data-testid="opener">
+    <section className="w-full max-w-[1080px] px-4 py-8 text-left sm:px-16 sm:py-12" data-testid="opener">
       <div className="text-[13px] font-semibold uppercase tracking-wider text-muted">Lookahead · if it had been running today</div>
       {o === null ? (
         <p className="mt-6 text-[24px] leading-snug sm:text-[32px]" data-testid="opener-empty">

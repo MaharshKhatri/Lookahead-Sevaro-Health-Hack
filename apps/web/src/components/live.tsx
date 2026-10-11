@@ -84,9 +84,8 @@ export function useStoreVersion(onVersion: () => void, debounceMs = 200): SseSta
       try {
         const d = JSON.parse(m.data) as { version?: number };
         if (typeof d.version !== 'number' || d.version === last) return;
-        const first = last === null;
+        // The first frame also refetches: a change that landed between the server render and the SSE connect would otherwise never show.
         last = d.version;
-        if (first) return;
         if (timer !== null) clearTimeout(timer);
         timer = setTimeout(() => cb.current(), debounceMs);
       } catch {

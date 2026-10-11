@@ -46,7 +46,7 @@ function Diagram() {
   const bx = x(5);
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} className="min-w-[720px] w-full" role="img" aria-labelledby="arch-title arch-desc">
+      <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto w-full min-w-[720px] max-w-[1100px]" role="img" aria-labelledby="arch-title arch-desc">
         <title id="arch-title">Lookahead decision pipeline</title>
         <desc id="arch-desc">
           ingest, replay, detect, forecast, decide and standby, approval, act, audit, in that order. People act at decide (coordinator), approval (clinical lead) and act (physician). Amazon Bedrock is a separate narrator sidecar that receives engine facts through the fidelity guard and returns text to the screen only; it has no path into approval, act or the action log.

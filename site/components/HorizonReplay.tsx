@@ -39,18 +39,25 @@ function FailTick({ cx, cy, delay }: { readonly cx: number; readonly cy: number;
   return <path className="hz-step" style={d(delay)} d={`M${cx - 4} ${cy + 12} L${cx + 4} ${cy + 20} M${cx + 4} ${cy + 12} L${cx - 4} ${cy + 20}`} stroke="var(--color-alarm)" strokeWidth="2" />;
 }
 
-function Figure() {
+function beats(): string[] {
   const oak = scenario.oakValley;
   const sun = scenario.suncrest;
   const rec = scenario.recommendation;
-  const onlineX = x(rec.start);
-  const summary = [
+  return [
     `${oak.triaged.slice(0, 5)}: a stroke consult is triaged at ${oak.hospital}; routing fails at ${oak.routingFailures.map((t) => t.slice(0, 5)).join(', ')} because ${oak.why}.`,
     `${sun.hospital}: ${sun.lastHourConsults} consults in the last hour against a normal p90 of ${sun.normalP90}; a stroke consult triaged at ${sun.strokeTriaged.slice(0, 5)} fails routing at ${sun.routingFailure.slice(0, 5)}.`,
     `${scenario.shiftEnds.at}: ${scenario.shiftEnds.physicians} physicians end their shifts ${scenario.shiftEnds.note}.`,
     `${scenario.now}: Lookahead recommends offering ${rec.shortName} ${rec.window}; the clinical lead approves.`,
     `From ${rec.start}, ${rec.shortName} is online and ${rec.effect}.`,
-  ].join(' ');
+  ];
+}
+
+function Figure() {
+  const oak = scenario.oakValley;
+  const sun = scenario.suncrest;
+  const rec = scenario.recommendation;
+  const onlineX = x(rec.start);
+  const summary = beats().join(' ');
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[760px]" role="img" aria-labelledby="hz-title hz-desc">
       <title id="hz-title">Horizon replay of the evening of {scenario.date}, 18:05 to 21:00 ET</title>
@@ -81,7 +88,7 @@ function Figure() {
       ))}
 
       {/* 1. Oak Valley: stroke triaged, routing fails three times */}
-      <text x={X0} y={LANE_OAK - 22} fontSize="13" fill="var(--color-ink-2)">
+      <text x={NOW + 12} y={LANE_OAK - 18} fontSize="13" fill="var(--color-ink-2)">
         {oak.hospital}
       </text>
       <line className="hz-step" style={d(0.3)} x1={x(oak.triaged)} x2={NOW} y1={LANE_OAK} y2={LANE_OAK} stroke="var(--color-alarm)" strokeWidth="4" />
@@ -94,7 +101,7 @@ function Figure() {
       </text>
 
       {/* 2. Suncrest surge (hatched = at risk) and its stroke consult */}
-      <text x={X0} y={LANE_SUN - 22} fontSize="13" fill="var(--color-ink-2)">
+      <text x={NOW + 12} y={LANE_SUN - 18} fontSize="13" fill="var(--color-ink-2)">
         {sun.hospital}
       </text>
       <rect className="hz-step" style={d(2.1)} x={X0} y={LANE_SUN - 9} width={NOW - X0} height={18} fill="url(#hz-hatch)" />
@@ -139,6 +146,11 @@ export function HorizonReplay() {
       <div className="overflow-x-auto rounded-[4px] border border-rule bg-surface px-2 py-4">
         <Figure key={run} />
       </div>
+      <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-[15px] text-ink-2 marker:text-ink-2 sm:hidden">
+        {beats().map((b) => (
+          <li key={b}>{b}</li>
+        ))}
+      </ol>
       <figcaption className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[15px] text-ink-2">
         <span>A real evening from Sevaro&apos;s challenge data, replayed.</span>
         <button type="button" onClick={() => setRun((r) => r + 1)} className="rounded-[4px] border border-rule px-3 py-1.5 text-[15px] text-ink hover:border-ink-3">

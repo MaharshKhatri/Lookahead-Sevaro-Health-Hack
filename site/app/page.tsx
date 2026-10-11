@@ -131,8 +131,18 @@ function Ledger() {
       <p className="max-w-[72ch] text-[17px] text-ink-2">
         All {facts.offShiftPhysicians} off-shift physicians, checked against every rule for the gap at Suncrest, Northfield and Oak Valley.
       </p>
-      <div className="mt-6 overflow-x-auto rounded-[4px] border border-rule">
-        <table className="w-full min-w-[560px] border-collapse text-left text-[15px]">
+      <ul className="mt-6 divide-y divide-rule rounded-[4px] border border-rule sm:hidden">
+        {ledger.map((r) => (
+          <li key={r.name} className={r.eligible ? 'border-l-2 border-action bg-action/10 px-4 py-3' : 'border-l-2 border-transparent px-4 py-3'}>
+            <p className="text-[15px] font-medium text-ink">
+              {r.name} <span className={r.eligible ? 'font-semibold text-action' : 'text-ink-2'}>{r.eligible ? 'Eligible' : 'Not eligible'}</span>
+            </p>
+            <p className={`mt-0.5 text-[15px] ${r.eligible ? 'text-ink' : 'text-caution'}`}>{r.reason}</p>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6 hidden overflow-x-auto rounded-[4px] border border-rule sm:block">
+        <table className="w-full border-collapse text-left text-[15px]">
           <caption className="sr-only">Eligibility ledger for the 18:35 to 22:35 offer</caption>
           <thead className="bg-surface text-ink-2">
             <tr>

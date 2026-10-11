@@ -73,8 +73,8 @@ export function ArchitectureDiagram() {
       </text>
       {[
         { x: 10, t: 'EC2', s: 'runs the app' },
-        { x: 290, t: 'DynamoDB', s: 'action log, atomic offer acceptance' },
-        { x: 570, t: 'Bedrock', s: 'narration only, behind a guard' },
+        { x: 290, t: 'DynamoDB', s: 'atomic offer acceptance' },
+        { x: 570, t: 'Bedrock', s: 'narration only' },
         { x: 850, t: 'S3', s: 'audit archive' },
       ].map((b) => (
         <g key={b.t}>

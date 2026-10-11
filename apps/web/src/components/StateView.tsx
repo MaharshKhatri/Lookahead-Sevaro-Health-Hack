@@ -27,7 +27,7 @@ const STATE_TONE: Record<string, string> = {
 function Physicians({ rows }: { readonly rows: readonly PhysicianRowDTO[] }) {
   return (
     <Panel testId="panel-physicians" title="Physicians — derived activity" right={<span className="text-[12px] text-muted">self-reported status is not activity</span>}>
-      <div className="scroll-thin overflow-auto">
+      <div className="scroll-thin overflow-auto" tabIndex={0} role="region" aria-label="Physicians table">
         <table className="w-full text-left text-[14px]">
           <thead className="sticky top-0 bg-panel text-[11px] uppercase tracking-wider text-muted">
             <tr>
@@ -93,7 +93,7 @@ const LEVEL_TONE = { ok: 'ok', warning: 'warning', critical: 'critical' } as con
 function Consults({ rows }: { readonly rows: readonly ConsultRowDTO[] }) {
   return (
     <Panel testId="panel-consults" title="Consults — lifecycle and time in stage" right={<span className="text-[12px] text-muted">brief Operational Standards</span>}>
-      <div className="scroll-thin overflow-auto">
+      <div className="scroll-thin overflow-auto" tabIndex={0} role="region" aria-label="Consults table">
         <table className="w-full text-left text-[14px]">
           <thead className="sticky top-0 bg-panel text-[11px] uppercase tracking-wider text-muted">
             <tr>

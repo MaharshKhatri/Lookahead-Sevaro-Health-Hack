@@ -6,6 +6,7 @@ import type { ViewDTO } from '@/lib/dto';
 import { ActPanel } from './ActPanel';
 import { AttentionList } from './AttentionList';
 import { CoverageGrid } from './CoverageGrid';
+import { ConsoleHorizon } from './ConsoleHorizon';
 import { DeltaChip } from './DeltaChip';
 import { HorizonTimeline } from './HorizonTimeline';
 import { LiveProvider, useLive } from './live';
@@ -25,11 +26,36 @@ function Foresight({ view }: { readonly view: ViewDTO }) {
   const standbys = view.standby?.standbys ?? [];
   const liveCount = standbys.filter((s) => !['declined', 'rejected', 'expired', 'cancelled', 'released'].includes(s.status)).length;
   const spiking = view.forecast?.hospitals.filter((h) => h.spikeNow).length ?? 0;
-  const tabs: { id: Tab; label: string; badge?: string | undefined; testId: string }[] = [
-    { id: 'radar', label: 'Surge radar', badge: spiking > 0 ? `${spiking} spiking` : undefined, testId: 'tab-radar' },
-    { id: 'bench', label: 'Standby bench', badge: `${view.standby?.plan.selected.length ?? 0} selected${liveCount > 0 ? ` · ${liveCount} live` : ''}`, testId: 'tab-bench' },
-    { id: 'timeline', label: 'Timeline', badge: view.intel === undefined ? undefined : `${view.intel.timeline.items.filter((i) => i.kind === 'action_deadline').length} deadlines`, testId: 'tab-timeline' },
-    { id: 'policy', label: 'Policy', badge: String(view.policy?.length ?? 0), testId: 'tab-policy' },
+  const tabs: {
+    id: Tab;
+    label: string;
+    badge?: string | undefined;
+    testId: string;
+  }[] = [
+    {
+      id: 'radar',
+      label: 'Surge radar',
+      badge: spiking > 0 ? `${spiking} spiking` : undefined,
+      testId: 'tab-radar',
+    },
+    {
+      id: 'bench',
+      label: 'Standby bench',
+      badge: `${view.standby?.plan.selected.length ?? 0} selected${liveCount > 0 ? ` · ${liveCount} live` : ''}`,
+      testId: 'tab-bench',
+    },
+    {
+      id: 'timeline',
+      label: 'Timeline',
+      badge: view.intel === undefined ? undefined : `${view.intel.timeline.items.filter((i) => i.kind === 'action_deadline').length} deadlines`,
+      testId: 'tab-timeline',
+    },
+    {
+      id: 'policy',
+      label: 'Policy',
+      badge: String(view.policy?.length ?? 0),
+      testId: 'tab-policy',
+    },
   ];
   return (
     <Panel
@@ -57,13 +83,21 @@ function Foresight({ view }: { readonly view: ViewDTO }) {
     >
       <div className="flex border-b border-border bg-panel px-2" role="tablist">
         {tabs.map((t) => (
-          <button key={t.id} type="button" role="tab" data-testid={t.testId} aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={cx('flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wider', tab === t.id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text')}>
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            data-testid={t.testId}
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={cx('flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wider', tab === t.id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text')}
+          >
             {t.label}
             {t.badge !== undefined && <span className="num rounded bg-raised px-1 text-[10px] normal-case tracking-normal text-muted">{t.badge}</span>}
           </button>
         ))}
       </div>
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto" tabIndex={0} role="region" aria-label="Forecast and standby detail">
         {tab === 'radar' && <SurgeRadar forecast={view.forecast} deltas={deltas} />}
         {tab === 'bench' && <StandbyBench view={view} deltas={deltas} />}
         {tab === 'timeline' && <HorizonTimeline view={view} />}
@@ -77,18 +111,21 @@ function Console() {
   const { view } = useLive();
   if (view === null) return <p className="p-8 text-muted">Loading the command center…</p>;
   return (
-    <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,30fr)_minmax(0,40fr)_minmax(0,30fr)] gap-3 p-3">
-      <AttentionList items={view.attention} incidents={view.intel?.incidents} reduction={view.intel?.reduction} />
-      <div className="flex min-h-0 flex-col gap-3">
-        <div className="min-h-0 flex-[11]">
-          <CoverageGrid grid={view.coverage} demand={view.demand} needs={view.needs} />
+    <>
+      <ConsoleHorizon view={view} />
+      <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,30fr)_minmax(0,40fr)_minmax(0,30fr)] gap-3 p-3">
+        <AttentionList items={view.attention} incidents={view.intel?.incidents} reduction={view.intel?.reduction} />
+        <div className="flex min-h-0 flex-col gap-3">
+          <div className="min-h-0 flex-[11]">
+            <CoverageGrid grid={view.coverage} demand={view.demand} needs={view.needs} />
+          </div>
+          <div className="min-h-0 flex-[9]">
+            <Foresight view={view} />
+          </div>
         </div>
-        <div className="min-h-0 flex-[9]">
-          <Foresight view={view} />
-        </div>
-      </div>
-      <ActPanel view={view} />
-    </main>
+        <ActPanel view={view} />
+      </main>
+    </>
   );
 }
 
@@ -96,7 +133,7 @@ function Console() {
 export function CommandCenter({ initial }: { readonly initial: ViewDTO | null }) {
   return (
     <LiveProvider initial={initial}>
-      <div className="flex h-screen flex-col overflow-hidden">
+      <div className="flex h-[calc(100dvh_-_var(--chrome-h,0px)_-_var(--pill-h,0px))] flex-col overflow-hidden">
         <TopBar />
         <Console />
       </div>

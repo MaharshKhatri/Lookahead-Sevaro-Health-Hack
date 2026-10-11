@@ -38,7 +38,7 @@ test('next best action: alert -> proposal in one click (<= 3), ranked queue with
   await expect(page.getByTestId('toast-ok')).toBeVisible();
   if (kind === 'SPLIT_SHIFT_OFFER') {
     await page.getByTestId('tab-offers').click();
-    await expect(page.getByTestId('offer-card').first().getByTestId('offer-status')).toHaveText('Awaiting approval');
+    await expect(page.getByTestId('offer-card').first().getByTestId('offer-status')).toHaveText('PROPOSED');
   }
   expect(clicks).toBeLessThanOrEqual(3);
   test.info().annotations.push({ type: 'clicks-to-proposal', description: String(clicks) });

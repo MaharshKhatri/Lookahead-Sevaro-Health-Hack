@@ -13,12 +13,13 @@ export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Bo
 
 type Tone = 'critical' | 'warning' | 'ok' | 'info' | 'accent' | 'muted';
 
+// Outline chips (UI pass, D-98): a tinted fill under colored text fell below WCAG AA (axe color-contrast); the border carries the tone.
 const TONE: Record<Tone, string> = {
-  critical: 'bg-critical/15 text-critical border-critical/50',
-  warning: 'bg-warning/15 text-warning border-warning/50',
-  ok: 'bg-ok/15 text-ok border-ok/50',
-  info: 'bg-info/15 text-info border-info/50',
-  accent: 'bg-accent/15 text-accent border-accent/50',
+  critical: 'text-critical border-critical/60',
+  warning: 'text-warning border-warning/60',
+  ok: 'text-ok border-ok/60',
+  info: 'text-info border-info/60',
+  accent: 'text-accent border-accent/60',
   muted: 'bg-raised text-muted border-border',
 };
 

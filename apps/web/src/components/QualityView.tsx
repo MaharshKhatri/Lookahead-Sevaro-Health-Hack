@@ -66,7 +66,7 @@ function Body({ report }: { readonly report: BacktestReport | null }) {
   const models = Object.keys(report.metrics);
   const fw = report.firstWarning;
   return (
-    <main className="scroll-thin flex-1 space-y-3 overflow-y-auto p-3" data-testid="quality">
+    <main className="scroll-thin flex-1 space-y-3 overflow-y-auto p-3" data-testid="quality" tabIndex={0} aria-label="Forecast quality">
       <Panel title={<>FORECAST QUALITY <span className="normal-case tracking-normal text-text">— rolling-origin backtest, honest by construction</span></>} right={<span className="num text-[12px] text-muted">{report.design.originCount} origins · {report.design.pairCount} (origin, hospital) pairs · {report.dataset.label}</span>}>
         <table className="w-full text-left text-[14px]" data-testid="quality-table">
           <thead className="text-[12px] uppercase tracking-wider text-muted">

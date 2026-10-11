@@ -162,7 +162,7 @@ paths:
   /api/health:
     get:
       tags: [admin]
-      summary: Store backend, Bedrock availability, dataset version, clock.
+      summary: Store backend, Bedrock availability, dataset version, clock; uptime, event count, DynamoDB and Bedrock checks (800 ms caps), live flag, last webhook delivery, last test report.
       responses:
         '200': { description: Health., content: { application/json: { schema: { type: object } } } }
   /api/integrity:
@@ -383,6 +383,28 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         '504': { $ref: '#/components/responses/Error' }
+  /api/patient-clock:
+    get:
+      tags: [console]
+      summary: Patient clock. The top unassigned stroke consult at the sim clock (engine topUnassignedStroke), or null.
+      responses:
+        '200': { description: '{clock, nowMs, clockMode, clockSpeed, version}.', content: { application/json: { schema: { type: object } } } }
+  /api/stress:
+    get:
+      tags: [console]
+      summary: Stress Test catalog (7 prove-it and 6 break-it actions) and totals since boot.
+      responses:
+        '200': { description: '{actions: [{id, group, label, description}], totals: {handled, errors, seconds, byAction}}.', content: { application/json: { schema: { type: object } } } }
+    post:
+      tags: [console]
+      summary: Run one Stress Test action through the real signed ingest and command paths; appends an automated internal alert to the audit log. DEMO_MODE or a coordinator/admin session.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [action], properties: { action: { type: string }, seed: { type: integer } } } } }
+      responses:
+        '200': { description: '{result: {id, action, group, ok, latencyMs, startedAtMs, summary, details, metrics, error}, totals}.', content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     ingestSignature:

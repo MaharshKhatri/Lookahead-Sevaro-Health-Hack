@@ -87,7 +87,7 @@ function RadarRow({ h, bucketMin, deltas }: { readonly h: HospitalForecastDTO; r
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[84px] w-full" role="img" aria-labelledby={`${titleId} ${descId}`}>
-        <title id={titleId}>Surge radar for {h.hospitalName}</title>
+        <title id={titleId}>{`Surge radar for ${h.hospitalName}`}</title>
         <desc id={descId}>{desc}</desc>
         {/* axes */}
         <line x1={PAD.l} x2={W - PAD.r} y1={y(0)} y2={y(0)} stroke="var(--color-border)" />

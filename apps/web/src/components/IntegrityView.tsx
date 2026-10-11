@@ -152,7 +152,7 @@ function Body() {
                   {CONSULT_COLS.map((c) => {
                     const off = bad.has(`${r.consult_id}|${c}`);
                     return (
-                      <td key={c} data-mismatch={off} title={off ? `reference: ${ref.get(r.consult_id)?.[c] ?? ''}` : undefined} className={cx('num px-2 py-0.5', off ? 'bg-critical/25 font-semibold text-critical' : 'text-text/85')}>
+                      <td key={c} data-mismatch={off} title={off ? `reference: ${ref.get(r.consult_id)?.[c] ?? ''}` : undefined} className={cx('num px-2 py-0.5', off ? 'bg-critical/25 font-semibold text-text underline decoration-critical decoration-2' : 'text-text/85')}>
                         {r[c]}
                         {off && <span className="ml-1.5 text-[11px] text-muted line-through">{ref.get(r.consult_id)?.[c]}</span>}
                       </td>

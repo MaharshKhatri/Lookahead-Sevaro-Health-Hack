@@ -68,7 +68,7 @@ function Card({ item, top, open, onToggle, action }: { readonly item: AttentionD
       <button type="button" onClick={onToggle} aria-expanded={open} className="w-full px-3 py-2.5 text-left">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
           <PriorityGlyph p={pr} />
-          <span className={pr === 'P1' ? 'text-critical' : pr === 'P2' ? 'text-warning' : 'text-muted'}>{PRIORITY_WORD[pr]}</span>
+          <span className={pr === 'P1' ? 'text-critical' : pr === 'P2' ? 'text-warning' : 'text-muted'}>{PRIORITY_WORD[pr].toUpperCase()}</span>
           {item.strokeAtRisk && <span className="text-critical">· Stroke</span>}
           <span className="font-normal normal-case tracking-normal text-muted">{KIND_LABEL[item.kind] ?? item.kind}</span>
           <span className={cx('num ml-auto whitespace-nowrap text-[13px] normal-case tracking-normal', item.timeToImpactMs <= 0 ? 'text-critical' : 'text-warning')}>{item.timeToImpactMs <= 0 ? 'now' : `in ${relMinutes(item.timeToImpactMs)}`}</span>

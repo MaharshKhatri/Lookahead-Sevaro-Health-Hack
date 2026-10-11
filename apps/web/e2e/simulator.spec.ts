@@ -23,7 +23,9 @@ test('simulator: new stroke consult -> accepted IngestReport -> webhook in the s
   const status = (await (await request.get('/api/simulator/status')).json()) as { enabled: boolean; webhookTarget: string };
   test.skip(!status.enabled, 'simulator disabled on this server (SIMULATOR_ENABLED=0 or DEMO_MODE=false)');
   const before = (await (await request.get('/api/view')).json()) as ViewLike;
-  const sinkBefore = ((await (await request.get('/api/simulator/webhook-sink')).json()) as { entries: unknown[] }).entries.length;
+  // The sink keeps the last 50 deliveries, so the test compares the newest entry's time, not the count (it stays 50 once full).
+  const sinkNewest = async () => ((await (await request.get('/api/simulator/webhook-sink')).json()) as { entries: { receivedAtMs: number }[] }).entries[0]?.receivedAtMs ?? 0;
+  const sinkNewestBefore = await sinkNewest();
 
   await page.goto('/simulator');
   await expect(page.getByTestId('simulator')).toBeVisible();
@@ -47,7 +49,8 @@ test('simulator: new stroke consult -> accepted IngestReport -> webhook in the s
 
   // The outbound webhook (debounced) reaches the dev sink within a few seconds when it is the dispatcher's target.
   if (status.webhookTarget === 'dev_sink') {
-    await expect.poll(async () => page.getByTestId('sim-webhook-row').count(), { timeout: 10_000 }).toBeGreaterThan(sinkBefore);
+    await expect.poll(sinkNewest, { timeout: 10_000 }).toBeGreaterThan(sinkNewestBefore);
+    await expect(page.getByTestId('sim-webhook-row').first()).toBeVisible();
     await expect(row.getByTestId('sim-timing')).not.toContainText('webhook received waiting', { timeout: 10_000 });
   }
   // The upstream chip appears in the top bar (the simulator posted within 60 s).

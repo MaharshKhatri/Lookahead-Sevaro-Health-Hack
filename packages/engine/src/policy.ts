@@ -459,3 +459,17 @@ export const REWIND_STEP_MIN = 5;
 export const REWIND_LATENCY_MIN = { leadApprovalMin: 2, ackMin: 3, activationApprovalMin: 2, acceptMin: 2 } as const;
 /** LOOKAHEAD-DEFINED (illustrative): unassigned stroke minutes are counted up to the reference instant plus this horizon; beyond the stream's end the actual line assumes a deadlock persists until its first known relief (OQ-32). */
 export const REWIND_EVAL_HORIZON_MIN = 60;
+
+// ---------------------------------------------------------------- Coordinator intelligence (Phase 6)
+/** LOOKAHEAD-DEFINED (illustrative): horizon of the timeline and the bands it draws (P(spike) and P(gap) at or above these values). */
+export const TIMELINE_HORIZON_MIN = 180;
+export const TIMELINE_SURGE_BAND_PSPIKE = 0.5;
+export const TIMELINE_GAP_BAND_PGAP = 0.5;
+/** LOOKAHEAD-DEFINED (illustrative): coordinator minutes each action costs, the denominator of the next-best-action score. */
+export const NBA_COORDINATOR_MINUTES = { REASSIGN_CONSULT: 2, ESCALATE_TO_CLINICAL_LEAD: 3, SPLIT_SHIFT_OFFER: 4, STANDBY_PREALERT: 3, NOTE_HANDOFF_PLAN: 5, VERIFY_PRESENCE: 1 } as const;
+/** LOOKAHEAD-DEFINED (illustrative): chance the action removes the risk it targets (offers and standbys use the roster-based P(accept) instead). */
+export const NBA_SUCCESS_PROBABILITY = { REASSIGN_CONSULT: 1, ESCALATE_TO_CLINICAL_LEAD: 0.5, NOTE_HANDOFF_PLAN: 0.8, VERIFY_PRESENCE: 1 } as const;
+/** LOOKAHEAD-DEFINED (illustrative): a General Neuro consult-minute counts this much against a stroke consult-minute in the ranking. */
+export const NBA_GENERAL_NEURO_WEIGHT = 0.25;
+/** LOOKAHEAD-DEFINED (illustrative): minutes a verify-presence or note-handoff action is assumed to protect (the open-notes window / the time to the critical threshold). */
+export const NBA_DEFAULT_PROTECTED_MIN = 30;

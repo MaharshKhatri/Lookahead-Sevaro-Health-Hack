@@ -137,6 +137,6 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await page.goto('/admin/dataset');
   await page.getByTestId('dataset-files').setInputFiles(upload);
   await expect(page.getByTestId('snapshot-check')).toBeVisible();
-  await shot(page, '15-admin-dataset-report');
+  await shot(page, '24-admin-dataset-report');
   await phoneCtx.close();
 });

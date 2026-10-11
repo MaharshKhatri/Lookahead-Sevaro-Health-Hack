@@ -103,7 +103,7 @@ function Card({ item, top, open, onToggle }: { readonly item: AttentionDTO; read
 
 export function AttentionList({ items, incidents, reduction }: { readonly items: readonly AttentionDTO[]; readonly incidents?: readonly Incident[]; readonly reduction?: { readonly items: number; readonly incidents: number; readonly percent: number } }) {
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
-  const [mode, setMode] = useState<'incidents' | 'items'>(incidents === undefined ? 'items' : 'incidents');
+  const [mode, setMode] = useState<'incidents' | 'items'>('items');
   const topId = items[0]?.id;
   const isOpen = (id: string) => openIds[id] ?? id === topId;
   const showIncidents = mode === 'incidents' && incidents !== undefined;

@@ -13,11 +13,11 @@ export const runtime = 'nodejs';
  * The engine's applyCommand decides (roles, eligibility, caps, PHI guard,
  * idempotency by commandId, optimistic expectedSeq -> 409 CONFLICT).
  * D-91 (server-side, before the store):
- *  1. the actor role must be allowed for the command type by the engine's
- *     COMMAND_ROLES (brief "Users and Decision Rights") -> 403 FORBIDDEN_ROLE;
- *  2. the role must be granted by this browser's session (coordinator is free
+ *  1. the role must be granted by this browser's session (coordinator is free
  *     in DEMO_MODE; the lead needs the PIN; DEMO_MODE=false needs a cookie for
  *     every role) -> 401;
+ *  2. the actor role must be allowed for the command type by the engine's
+ *     COMMAND_ROLES (brief "Users and Decision Rights") -> 403 FORBIDDEN_ROLE;
  *  3. a physician's answer needs the offer link token (x-lookahead-offer-token
  *     or body.token) -> 403 BAD_TOKEN, and physician calls are rate limited.
  */
@@ -26,9 +26,10 @@ export function POST(req: Request): Promise<Response> {
     const actor = actorFrom(req.headers);
     const body = await readJson(req);
     const command = parseCommand(body, actor);
+    // Authenticate the role first (401), then authorize the command for it (403).
+    requireRoleSession(req, actor.role);
     const allowed = COMMAND_ROLES[command.type];
     if (!allowed.includes(actor.role)) throw new StoreError('FORBIDDEN_ROLE', `${actor.role} may not ${command.type} (allowed: ${allowed.join(', ')}; brief "Users and Decision Rights")`);
-    requireRoleSession(req, actor.role);
     if (actor.role === 'physician') enforceRateLimit('physician', clientKey(req));
     const token = req.headers.get('x-lookahead-offer-token') ?? (typeof body.token === 'string' ? body.token : null);
     if (command.type === 'respond') {

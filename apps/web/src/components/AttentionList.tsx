@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { Incident } from '@lookahead/engine';
 import type { AttentionDTO } from '@/lib/dto';
+import { IncidentList } from './Incidents';
 import { relMinutes } from '@/lib/format';
 import { Explain } from './Explain';
 import { EvidenceChip, Panel, SeverityChip, StrokeTag, cx } from './ui';
@@ -99,10 +101,12 @@ function Card({ item, top, open, onToggle }: { readonly item: AttentionDTO; read
   );
 }
 
-export function AttentionList({ items }: { readonly items: readonly AttentionDTO[] }) {
+export function AttentionList({ items, incidents, reduction }: { readonly items: readonly AttentionDTO[]; readonly incidents?: readonly Incident[]; readonly reduction?: { readonly items: number; readonly incidents: number; readonly percent: number } }) {
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+  const [mode, setMode] = useState<'incidents' | 'items'>(incidents === undefined ? 'items' : 'incidents');
   const topId = items[0]?.id;
   const isOpen = (id: string) => openIds[id] ?? id === topId;
+  const showIncidents = mode === 'incidents' && incidents !== undefined;
   return (
     <Panel
       testId="panel-now"
@@ -113,16 +117,34 @@ export function AttentionList({ items }: { readonly items: readonly AttentionDTO
         </>
       }
       right={
-        <span className="num text-[13px] text-muted">
-          {items.filter((i) => i.severity === 'critical').length} critical · {items.length} items
-        </span>
+        <div className="flex items-center gap-2">
+          {incidents !== undefined && (
+            <div className="flex rounded border border-border text-[12px]" role="tablist" aria-label="group attention items">
+              <button type="button" role="tab" data-testid="now-mode-incidents" aria-selected={showIncidents} onClick={() => setMode('incidents')} className={cx('px-2 py-0.5', showIncidents ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
+                Incidents
+              </button>
+              <button type="button" role="tab" data-testid="now-mode-items" aria-selected={!showIncidents} onClick={() => setMode('items')} className={cx('px-2 py-0.5', !showIncidents ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
+                Items
+              </button>
+            </div>
+          )}
+          <span className="num text-[13px] text-muted" data-testid="now-count">
+            {showIncidents && reduction !== undefined ? `${reduction.items} items → ${reduction.incidents} incidents (−${reduction.percent}%)` : `${items.filter((i) => i.severity === 'critical').length} critical · ${items.length} items`}
+          </span>
+        </div>
       }
     >
-      <div className="scroll-thin flex-1 space-y-2.5 overflow-y-auto p-3">
-        {items.map((it, i) => (
-          <Card key={it.id} item={it} top={i === 0} open={isOpen(it.id)} onToggle={() => setOpenIds((o) => ({ ...o, [it.id]: !isOpen(it.id) }))} />
-        ))}
-        {items.length === 0 && <p className="p-4 text-muted">Nothing needs attention at this instant.</p>}
+      <div className="scroll-thin flex-1 overflow-y-auto">
+        {showIncidents ? (
+          <IncidentList incidents={incidents} items={items} />
+        ) : (
+          <div className="space-y-2.5 p-3">
+            {items.map((it, i) => (
+              <Card key={it.id} item={it} top={i === 0} open={isOpen(it.id)} onToggle={() => setOpenIds((o) => ({ ...o, [it.id]: !isOpen(it.id) }))} />
+            ))}
+            {items.length === 0 && <p className="p-4 text-muted">Nothing needs attention at this instant.</p>}
+          </div>
+        )}
       </div>
     </Panel>
   );

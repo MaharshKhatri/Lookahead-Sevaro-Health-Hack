@@ -22,6 +22,8 @@ const LINKS = [
   { href: '/integrity', label: 'Integrity' },
   { href: '/inject', label: 'Inject' },
   { href: '/lead', label: 'Lead inbox' },
+  { href: '/rewind', label: 'Rewind' },
+  { href: '/quality', label: 'Quality' },
   { href: '/admin/dataset', label: 'Dataset' },
 ];
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import type { EscalationDTO, OfferDTO, ViewDTO, WhatIfRowDTO } from '@/lib/dto';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { EscalationDTO, OfferDTO, StandbyDTO, ViewDTO, WhatIfRowDTO } from '@/lib/dto';
 import { etEnd, etHm, etHms } from '@/lib/format';
 import { Explain } from './Explain';
 import { LiveProvider, useLive } from './live';
@@ -156,11 +156,89 @@ function EscalationCard({ e }: { readonly e: EscalationDTO }) {
   );
 }
 
+/** Standby approvals (Phase 4/7, D-90): the pre-alert, the activation and the release each need the clinical lead. */
+function StandbyApproval({ s }: { readonly s: StandbyDTO }) {
+  const { send } = useLive();
+  const [reason, setReason] = useState('');
+  const stage = s.status === 'proposed' ? 'prealert' : s.status === 'activation_proposed' ? 'activation' : s.status === 'acknowledged' ? 'release' : null;
+  if (stage === null) return null;
+  const title = stage === 'prealert' ? `Standby pre-alert to ${s.name}` : stage === 'activation' ? `Activate standby: ${s.name}` : `Release standby: ${s.name}`;
+  const text = stage === 'prealert' ? s.message : stage === 'activation' ? (s.activation?.message ?? '') : `Stand-down ${s.standDownRecommended ? 'recommended (risk faded at two consecutive checks)' : 'available (risk still present; the lead decides)'}.`;
+  return (
+    <article data-testid="lead-standby" data-standby-id={s.standbyId} data-stage={stage} className="rounded-2xl border border-info/60 bg-panel p-4">
+      <div className="flex items-center gap-2">
+        <Chip tone={stage === 'release' ? 'muted' : 'info'}>{stage === 'release' ? 'RELEASE' : 'APPROVAL NEEDED'}</Chip>
+        <Chip tone="accent">STANDBY</Chip>
+        <span className="num ml-auto text-[13px] text-muted">{etHm(s.proposedAtMs)}</span>
+      </div>
+      <h3 className="mt-2 text-[22px] font-semibold leading-tight">{title}</h3>
+      <div className="num mt-1 text-[16px] text-text">
+        {etHm(s.window.startMs)}–{etHm(s.window.endMs)} ET · covers {s.hospitalNames.map(shortName).join(', ')}
+      </div>
+      <div className="text-[14px] text-muted">
+        P(accept) {s.pAccept} · {s.valueEUM} weighted uncovered minutes avoided · false-alarm chance {s.falseAlarmChance}
+      </div>
+      {stage === 'activation' && s.activation !== null && (
+        <Section title="Why now">
+          {s.activation.trigger.detail}
+          <div className="mt-1 text-[13px] text-muted">log on by {etHm(s.activation.logOnByMs)} ET · scope {s.activation.scopeHospitalIds.join(', ')} · seeded at {s.activation.seededConsultCount} consults (split-shift trap)</div>
+        </Section>
+      )}
+      <Section title={stage === 'release' ? 'Status' : 'Message to the physician (no patient information)'}>
+        <pre className="whitespace-pre-wrap font-sans text-[15px]">{text}</pre>
+      </Section>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {stage === 'prealert' && (
+          <>
+            <Button size="lg" tone="ok" testId="lead-approve-standby" onClick={() => void send({ type: 'approveStandby', standbyId: s.standbyId }, { okText: `Pre-alert sent to ${s.name} (simulated ${s.channel})` })}>
+              Approve pre-alert
+            </Button>
+            <Button size="lg" tone="critical" testId="lead-reject-standby" onClick={() => void send({ type: 'rejectStandby', standbyId: s.standbyId, ...(reason.trim() === '' ? {} : { reason: reason.trim() }) }, { okText: 'Pre-alert rejected' })}>
+              Reject
+            </Button>
+          </>
+        )}
+        {stage === 'activation' && (
+          <>
+            <Button size="lg" tone="ok" testId="lead-approve-activation" onClick={() => void send({ type: 'approveActivation', standbyId: s.standbyId }, { okText: `Activation sent to ${s.name}` })}>
+              Approve activation
+            </Button>
+            <Button size="lg" tone="critical" testId="lead-reject-activation" onClick={() => void send({ type: 'rejectActivation', standbyId: s.standbyId, ...(reason.trim() === '' ? {} : { reason: reason.trim() }) }, { okText: 'Activation rejected' })}>
+              Reject
+            </Button>
+          </>
+        )}
+        {stage === 'release' && (
+          <Button size="lg" tone={s.standDownRecommended ? 'ok' : 'muted'} className="col-span-2" testId="lead-release-standby" onClick={() => void send({ type: 'releaseStandby', standbyId: s.standbyId, ...(reason.trim() === '' ? {} : { reason: reason.trim() }) }, { okText: `${s.name} released` })}>
+            Release standby
+          </Button>
+        )}
+      </div>
+      {stage !== 'release' && <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason if rejecting (kept in the audit)" className="mt-2 w-full rounded-lg border border-border bg-bg p-2 text-[15px]" data-testid="lead-standby-reason" />}
+    </article>
+  );
+}
+
 function Inbox() {
-  const { view, sse, toasts, dismiss } = useLive();
+  const { view, sse, toasts, dismiss, send } = useLive();
+  // Keyboard: A approves the first item waiting (offer, standby pre-alert or activation), unless typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (view === null || (e.key !== 'a' && e.key !== 'A') || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      const offer = view.offers.find((o) => o.status === 'proposed');
+      const sb = (view.standby?.standbys ?? []).find((s) => s.status === 'proposed' || s.status === 'activation_proposed');
+      if (offer !== undefined) void send({ type: 'approveOffer', offerId: offer.offerId }, { okText: `Approved: sent to ${offer.name}` });
+      else if (sb !== undefined) void send({ type: sb.status === 'proposed' ? 'approveStandby' : 'approveActivation', standbyId: sb.standbyId }, { okText: `Approved: ${sb.name}` });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [view, send]);
   if (view === null) return <p className="p-6 text-muted">Loading…</p>;
   const pending = view.offers.filter((o) => o.status === 'proposed');
   const escalations = view.escalations.filter((e) => e.authorizedAtMs === null);
+  const standbys = (view.standby?.standbys ?? []).filter((s) => s.status === 'proposed' || s.status === 'activation_proposed' || (s.status === 'acknowledged' && s.standDownRecommended));
   const recent = [...view.offers].reverse().filter((o) => o.status !== 'proposed');
   return (
     <div className="mx-auto min-h-screen max-w-[520px] px-4 pb-10 pt-4">
@@ -178,10 +256,13 @@ function Inbox() {
         {pending.map((o) => (
           <OfferApproval key={o.offerId} o={o} view={view} />
         ))}
+        {standbys.map((s) => (
+          <StandbyApproval key={s.standbyId} s={s} />
+        ))}
         {escalations.map((e) => (
           <EscalationCard key={e.escalationId} e={e} />
         ))}
-        {pending.length === 0 && escalations.length === 0 && (
+        {pending.length === 0 && escalations.length === 0 && standbys.length === 0 && (
           <div className="rounded-2xl border border-border bg-panel p-6 text-center text-muted" data-testid="lead-empty">
             Nothing waiting for you.
           </div>

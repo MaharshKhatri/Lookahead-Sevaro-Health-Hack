@@ -1,5 +1,5 @@
 import 'server-only';
-import { QUIET_FEED_BANNER_MS, headSeq, planWithLog, recommendNext, type ActContext, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
+import { QUIET_FEED_BANNER_MS, buildCoordinatorIntel, headSeq, planWithLog, recommendNext, type ActContext, type AttentionItem, type DecisionReport, type EventRef, type Intervention, type NetworkState, type PhysicianFlag, type StandardEvaluation } from '@lookahead/engine';
 import type { AttentionDTO, ConsultRowDTO, EvidenceDTO, FlagDTO, InjectSampleDTO, OfferContextDTO, PhysicianRowDTO, RecommendationDTO, RecommendedOfferDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { actContext, fitKey, forecastFor, rememberFit } from './forecast';
@@ -47,6 +47,7 @@ function buildView(s: StoreSnapshot): ViewDTO {
   const offers = offerDTOs(s.log, nowMs);
   const recommendedOffer = recommendedOfferDTO(d, hospitalName);
   const lastEventAtMs = lastIngested(s, nowMs);
+  const forecast = forecastFor(s, det.state, fit);
   return {
     bootId: s.bootId,
     dataset: {
@@ -82,9 +83,11 @@ function buildView(s: StoreSnapshot): ViewDTO {
     physicians: physicianRows(det.state),
     consults: consultRows(det.state, det.standards, nowMs),
     sample: injectSample(s, d),
-    forecast: forecastFor(s, det.state, fit),
+    forecast,
     standby: { plan: standbyPlanDTO(plan), standbys: standbyDTOs(ctxWithFit, s, plan, d) },
     policy: policyCatalog(),
+    // Phase 6: incidents, horizon timeline and the next-best-action queue, all from the same engine pass.
+    intel: buildCoordinatorIntel({ dataset: s.dataset, decision: d, forecast, plan, log: s.log, nowMs }),
   };
 }
 

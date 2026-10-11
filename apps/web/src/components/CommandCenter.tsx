@@ -7,6 +7,7 @@ import { ActPanel } from './ActPanel';
 import { AttentionList } from './AttentionList';
 import { CoverageGrid } from './CoverageGrid';
 import { DeltaChip } from './DeltaChip';
+import { HorizonTimeline } from './HorizonTimeline';
 import { LiveProvider, useLive } from './live';
 import { PolicyPanel } from './PolicyPanel';
 import { StandbyBench } from './StandbyBench';
@@ -15,7 +16,7 @@ import { TopBar } from './TopBar';
 import { Panel, cx } from './ui';
 import { useDeltas } from './useDelta';
 
-type Tab = 'radar' | 'bench' | 'policy';
+type Tab = 'radar' | 'bench' | 'timeline' | 'policy';
 
 /** Middle-column lower panel (Phase 7): SURGE RADAR / STANDBY BENCH / POLICY tabs under the coverage grid. */
 function Foresight({ view }: { readonly view: ViewDTO }) {
@@ -27,6 +28,7 @@ function Foresight({ view }: { readonly view: ViewDTO }) {
   const tabs: { id: Tab; label: string; badge?: string | undefined; testId: string }[] = [
     { id: 'radar', label: 'Surge radar', badge: spiking > 0 ? `${spiking} spiking` : undefined, testId: 'tab-radar' },
     { id: 'bench', label: 'Standby bench', badge: `${view.standby?.plan.selected.length ?? 0} selected${liveCount > 0 ? ` · ${liveCount} live` : ''}`, testId: 'tab-bench' },
+    { id: 'timeline', label: 'Timeline', badge: view.intel === undefined ? undefined : `${view.intel.timeline.items.filter((i) => i.kind === 'action_deadline').length} deadlines`, testId: 'tab-timeline' },
     { id: 'policy', label: 'Policy', badge: String(view.policy?.length ?? 0), testId: 'tab-policy' },
   ];
   return (
@@ -64,6 +66,7 @@ function Foresight({ view }: { readonly view: ViewDTO }) {
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         {tab === 'radar' && <SurgeRadar forecast={view.forecast} deltas={deltas} />}
         {tab === 'bench' && <StandbyBench view={view} deltas={deltas} />}
+        {tab === 'timeline' && <HorizonTimeline view={view} />}
         {tab === 'policy' && <PolicyPanel policy={view.policy} />}
       </div>
     </Panel>
@@ -75,7 +78,7 @@ function Console() {
   if (view === null) return <p className="p-8 text-muted">Loading the command center…</p>;
   return (
     <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,30fr)_minmax(0,40fr)_minmax(0,30fr)] gap-3 p-3">
-      <AttentionList items={view.attention} />
+      <AttentionList items={view.attention} incidents={view.intel?.incidents} reduction={view.intel?.reduction} />
       <div className="flex min-h-0 flex-col gap-3">
         <div className="min-h-0 flex-[11]">
           <CoverageGrid grid={view.coverage} demand={view.demand} needs={view.needs} />

@@ -5,6 +5,7 @@ import type { OfferDTO, RecStepDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { LedgerTab, OffersTab, TrapTab, WhatIfTab } from './ActTabs';
 import { Explain } from './Explain';
+import { NextActions } from './NextActions';
 import { useLive } from './live';
 import { Button, Chip, Panel, StatusPill, cx, shortName } from './ui';
 
@@ -135,6 +136,7 @@ export function ActPanel({ view }: { readonly view: ViewDTO }) {
   return (
     <Panel testId="panel-act" className="h-full" title="ACT" right={<span className="text-[12px] text-muted">acting as {role === 'coordinator' ? 'Coordinator' : 'Clinical lead'}</span>}>
       <div className="scroll-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <NextActions view={view} />
         <div className="border-b border-border p-4" data-testid="recommendation">
           <div className="mb-1 flex items-center gap-2">
             <Chip tone="accent">RECOMMENDATION</Chip>

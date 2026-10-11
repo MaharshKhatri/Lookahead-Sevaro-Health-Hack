@@ -19,6 +19,7 @@ import type {
   StandbySelection,
   StandbyStatus,
   SurgeForecast,
+  CoordinatorIntel,
 } from '@lookahead/engine';
 
 export type UiRole = 'coordinator' | 'clinical_lead' | 'physician';
@@ -539,6 +540,8 @@ export interface ViewDTO {
   readonly standby: { readonly plan: StandbyPlanDTO; readonly standbys: readonly StandbyDTO[] };
   /** Read-only policy catalog (every FORECAST_/HAWKES_/STROKE_SHARE_/STANDBY_/REWIND_ constant plus brief limits). */
   readonly policy: readonly PolicyEntryDTO[];
+  /** Phase 6: incidents (root-cause groups of attention items), the 180-min horizon timeline and the next-best-action queue (D-95). */
+  readonly intel: CoordinatorIntel;
   /** QR (SVG markup) per delivered offer, for the current request's origin. */
   readonly qr?: Readonly<Record<string, { readonly url: string; readonly svg: string }>>;
 }

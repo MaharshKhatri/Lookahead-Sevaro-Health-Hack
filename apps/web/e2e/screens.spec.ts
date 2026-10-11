@@ -113,7 +113,7 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await shot(phone, '20-lead-standby-390');
   await phone.getByTestId('lead-approve-standby').click();
   const benchCard = page.locator('[data-testid=bench-card]').first();
-  await expect(benchCard.getByTestId('standby-status')).toHaveText('PRE-ALERT DELIVERED');
+  await expect(benchCard.getByTestId('standby-status')).toHaveText('Pre-alert sent');
   const sbHref = (await benchCard.getByTestId('standby-link').getAttribute('href')) ?? '';
   await phone.goto(sbHref);
   await expect(phone.getByTestId('standby-headline')).toBeVisible();

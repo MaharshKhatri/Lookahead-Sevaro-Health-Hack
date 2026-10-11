@@ -17,32 +17,53 @@ import type { Delta } from './useDelta';
  */
 
 const STATUS_WORD: Readonly<Record<string, string>> = {
-  proposed: 'PROPOSED',
-  approved: 'APPROVED',
-  prealert_sent: 'PRE-ALERT SENT',
-  prealert_delivered: 'PRE-ALERT DELIVERED',
-  acknowledged: 'READY (ACKNOWLEDGED)',
-  declined: 'NOT TONIGHT',
-  rejected: 'REJECTED',
-  expired: 'EXPIRED',
-  cancelled: 'CANCELLED',
-  activation_proposed: 'ACTIVATION PROPOSED',
-  activation_approved: 'ACTIVATION APPROVED',
-  activation_sent: 'ACTIVATION SENT',
-  activation_delivered: 'ACTIVATION DELIVERED',
-  activated: 'ACTIVATED',
-  activation_declined: 'ACTIVATION DECLINED',
-  released: 'RELEASED',
+  proposed: 'Awaiting approval',
+  approved: 'Approved',
+  prealert_sent: 'Pre-alert sent',
+  prealert_delivered: 'Pre-alert sent',
+  acknowledged: 'Acknowledged',
+  declined: 'Declined',
+  rejected: 'Rejected',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+  activation_proposed: 'Activation awaiting approval',
+  activation_approved: 'Activation approved',
+  activation_sent: 'Activation sent',
+  activation_delivered: 'Activation sent',
+  activated: 'Active',
+  activation_declined: 'Activation declined',
+  released: 'Released',
+  candidate: 'Proposed by the engine',
 };
+
+/** Shape per state (never color alone, UI pass): ring = waiting on a person, dot = sent, bar = act now, square = settled, cross = ended. */
+const statusShape = (s: string): 'ring' | 'dot' | 'bar' | 'square' | 'cross' =>
+  s === 'proposed' || s === 'activation_proposed' || s === 'candidate' ? 'ring' : s === 'activation_recommended' ? 'bar' : s === 'activated' || s === 'released' || s === 'acknowledged' ? 'square' : ['declined', 'rejected', 'expired', 'cancelled', 'activation_declined'].includes(s) ? 'cross' : 'dot';
+
+function initials(name: string): string {
+  const parts = name.replace(/^Dr\.?\s+/i, '').split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase();
+}
 
 const statusTone = (s: string): 'ok' | 'warning' | 'critical' | 'info' | 'muted' =>
   s === 'activated' ? 'ok' : s === 'acknowledged' ? 'ok' : s.endsWith('delivered') ? 'warning' : s === 'expired' || s === 'rejected' ? 'critical' : s === 'declined' || s === 'released' || s === 'cancelled' || s === 'activation_declined' ? 'muted' : 'info';
 
-export function StandbyStatusChip({ status }: { readonly status: string }) {
+export function StandbyStatusChip({ status, recommended = false }: { readonly status: string; readonly recommended?: boolean }) {
+  const shown = recommended && status === 'acknowledged' ? 'activation_recommended' : status;
+  const tone = shown === 'activation_recommended' ? 'warning' : statusTone(status);
+  const color = `var(--color-${tone === 'muted' ? 'muted' : tone})`;
+  const shape = statusShape(shown);
   return (
-    <Chip tone={statusTone(status)} className="rounded-full px-2.5 py-1 text-[12px]">
-      <span data-testid="standby-status">{STATUS_WORD[status] ?? status.toUpperCase()}</span>
-    </Chip>
+    <span className={cx('inline-flex items-center gap-1.5 rounded-[2px] border px-1.5 py-px text-[11px] font-semibold uppercase tracking-wide', tone === 'muted' ? 'border-border text-muted' : `border-${tone}/60 text-${tone}`)}>
+      <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+        {shape === 'dot' && <circle cx="4" cy="4" r="3.2" fill={color} />}
+        {shape === 'ring' && <circle cx="4" cy="4" r="3" fill="none" stroke={color} strokeWidth="1.4" />}
+        {shape === 'square' && <rect x="0.8" y="0.8" width="6.4" height="6.4" fill={color} />}
+        {shape === 'bar' && <rect x="0.5" y="2.5" width="7" height="3" fill={color} />}
+        {shape === 'cross' && <path d="M1 1 L7 7 M7 1 L1 7" stroke={color} strokeWidth="1.5" />}
+      </svg>
+      <span data-testid="standby-status">{shown === 'activation_recommended' ? 'Activation recommended' : (STATUS_WORD[status] ?? status.replace(/_/g, ' '))}</span>
+    </span>
   );
 }
 
@@ -65,12 +86,15 @@ function Card({ sel, live, plan, names }: { readonly sel: StandbyPlanDTO['select
   const anyLive = live !== null && LIVE.includes(live.status);
   const okText = (t: string) => ({ okText: t });
   return (
-    <article data-testid="bench-card" data-physician-id={physicianId} data-status={status ?? 'candidate'} className={cx('rounded-lg border p-2.5', status === 'activated' ? 'border-ok/70 bg-ok/8' : anyLive ? 'border-accent/60 bg-raised/40' : 'border-border bg-raised/30')}>
+    <article data-testid="bench-card" data-physician-id={physicianId} data-status={status ?? 'candidate'} className={cx('rounded-[2px] border border-l-2 bg-panel p-2.5', status === 'activated' ? 'border-border border-l-ok' : anyLive ? 'border-border border-l-accent' : 'border-border border-l-border')}>
       <div className="flex flex-wrap items-center gap-2">
+        <span aria-hidden="true" className="num inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] border border-border bg-raised text-[11px] font-semibold text-text">
+          {initials(name)}
+        </span>
         <span className="text-[15px] font-semibold">{name}</span>
-        <span className="num text-[12px] text-muted">{physicianId}</span>
-        {sel !== null && <Chip tone="accent">ROUND {sel.round}</Chip>}
-        {status !== null ? <StandbyStatusChip status={status} /> : <Chip tone="muted">CANDIDATE</Chip>}
+        <span className="num text-[11px] text-muted">{physicianId}</span>
+        {sel !== null && <span className="text-[11px] uppercase tracking-wide text-muted">round {sel.round}</span>}
+        {status !== null ? <StandbyStatusChip status={status} recommended={live?.activationRecommended != null} /> : <StandbyStatusChip status="candidate" />}
         {live?.msUntilExpiry !== null && live?.msUntilExpiry !== undefined && <span className="num text-[12px] text-warning">expires {etHm(live.prealertExpiresAtMs ?? 0)}</span>}
       </div>
       <div className="num mt-1 text-[13px] text-text">
@@ -81,7 +105,7 @@ function Card({ sel, live, plan, names }: { readonly sel: StandbyPlanDTO['select
           P(accept) <span className="num text-text">{pct(pAccept)}</span>
         </span>
         <span title="Expected stroke-weighted uncovered minutes avoided (D-90 4.3)">
-          EUM avoided <span className="num text-text" data-testid="bench-eum">{value}</span>
+          <span className="num text-text" data-testid="bench-eum">{value}</span> expected uncovered minutes avoided
         </span>
         <span title="1 − max covered P(gap): the chance this physician is called in for nothing">
           false alarm <span className="num text-text">{pct(falseAlarm)}</span>

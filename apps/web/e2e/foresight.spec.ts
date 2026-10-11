@@ -38,7 +38,7 @@ test('next best action: alert -> proposal in one click (<= 3), ranked queue with
   await expect(page.getByTestId('toast-ok')).toBeVisible();
   if (kind === 'SPLIT_SHIFT_OFFER') {
     await page.getByTestId('tab-offers').click();
-    await expect(page.getByTestId('offer-card').first().getByTestId('offer-status')).toHaveText('PROPOSED');
+    await expect(page.getByTestId('offer-card').first().getByTestId('offer-status')).toHaveText('Awaiting approval');
   }
   expect(clicks).toBeLessThanOrEqual(3);
   test.info().annotations.push({ type: 'clicks-to-proposal', description: String(clicks) });
@@ -68,7 +68,7 @@ test('@demo standby loop: pre-alert on the bench -> lead approves -> phone "I ca
   const card = page.locator('[data-testid=bench-card]').first();
   await expect(card).toBeVisible();
   await card.getByTestId('bench-prealert').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('PROPOSED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Awaiting approval');
 
   const leadCtx = await browser.newContext(device(baseURL, { width: 390, height: 844 }, true));
   const lead = await leadCtx.newPage();
@@ -77,7 +77,7 @@ test('@demo standby loop: pre-alert on the bench -> lead approves -> phone "I ca
   await expect(leadCard).toHaveAttribute('data-stage', 'prealert');
   await expect(leadCard).not.toContainText(/CON-\d+|EVT-\d+|stroke|patient/i);
   await lead.getByTestId('lead-approve-standby').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('PRE-ALERT DELIVERED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Pre-alert sent');
 
   const phoneCtx = await browser.newContext(device(baseURL, { width: 390, height: 844 }, true));
   const phone = await phoneCtx.newPage();
@@ -85,18 +85,18 @@ test('@demo standby loop: pre-alert on the bench -> lead approves -> phone "I ca
   await expect(phone.getByTestId('standby-headline')).toBeVisible();
   await phone.getByTestId('standby-ready').click();
   await expect(phone.getByTestId('standby-status')).toHaveText(/READY|ACKNOWLEDGED|ON STANDBY/);
-  await expect(card.getByTestId('standby-status')).toHaveText(/READY/);
+  await expect(card.getByTestId('standby-status')).toHaveText(/Acknowledged|Activation recommended/);
 
   // A covered hospital is deadlocked now, so activation is recommended; the coordinator proposes it.
   await card.getByTestId('bench-propose-activation').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('ACTIVATION PROPOSED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Activation awaiting approval');
   await expect(lead.getByTestId('lead-standby')).toHaveAttribute('data-stage', 'activation');
   await lead.getByTestId('lead-approve-activation').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('ACTIVATION DELIVERED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Activation sent');
   await expect(phone.getByTestId('activation-accept')).toBeVisible();
   await phone.getByTestId('activation-accept').click();
   await expect(phone.getByTestId('standby-status')).toHaveText('ACTIVATED');
-  await expect(card.getByTestId('standby-status')).toHaveText('ACTIVATED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Active');
   await expect.poll(() => page.locator('[data-testid=coverage-grid] td[data-class=DEADLOCK]').count()).toBeLessThan(deadlockBefore);
   await leadCtx.close();
   await phoneCtx.close();
@@ -111,19 +111,19 @@ test('release path: pre-alert -> ready -> the lead releases -> RELEASED with a P
   const lead = await leadCtx.newPage();
   await openLead(lead);
   await lead.getByTestId('lead-approve-standby').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('PRE-ALERT DELIVERED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Pre-alert sent');
   const phoneCtx = await browser.newContext(device(baseURL, { width: 390, height: 844 }, true));
   const phone = await phoneCtx.newPage();
   await phone.goto(await standbyLink(card));
   await phone.getByTestId('standby-ready').click();
-  await expect(card.getByTestId('standby-status')).toHaveText(/READY/);
+  await expect(card.getByTestId('standby-status')).toHaveText(/Acknowledged|Activation recommended/);
   // The console's lead role releases (the bench offers Release while acknowledged; the lead PIN is needed).
   await page.getByTestId('role-switcher').selectOption('clinical_lead');
   await page.getByTestId('console-pin').fill(LEAD_PIN);
   await page.getByTestId('console-pin-submit').click();
   await expect(page.getByTestId('role-switcher')).toHaveValue('clinical_lead');
   await card.getByTestId('bench-release').click();
-  await expect(card.getByTestId('standby-status')).toHaveText('RELEASED');
+  await expect(card.getByTestId('standby-status')).toHaveText('Released');
   await expect(phone.getByTestId('standby-status')).toHaveText('RELEASED');
   await expect(phone.getByTestId('phone-standby')).toContainText('No action needed');
   await expect(phone.getByTestId('phone-standby')).not.toContainText(/CON-\d+|EVT-\d+|stroke|patient/i);

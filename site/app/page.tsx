@@ -192,7 +192,7 @@ function Standby() {
       <p className="mt-6 max-w-[72ch] text-[17px] text-ink-2">Every message to an off-shift physician, at every step, needs the clinical lead’s approval first.</p>
       {facts.rewind !== null && (
         <p className="mt-4 max-w-[72ch] text-[17px] text-ink">
-          Replaying this day with the standby network on, the Oak Valley stroke consult would have waited <span className="font-semibold text-action">{facts.rewind.anticipatoryWaitMin} min</span> instead of <span className="font-semibold text-alarm">{facts.rewind.actualWaitMin} min</span> (counted to 19:20, when the data ends). Across the day, anticipation averts {facts.rewind.strokeMinutesAverted} stroke consult-minutes of waiting.
+          Replaying this day with the standby network on, the Oak Valley stroke consult would have waited <span className="font-semibold text-action">{facts.rewind.anticipatoryWaitMin} min</span> instead of <span className="font-semibold text-ink underline decoration-alarm decoration-2 underline-offset-4">{facts.rewind.actualWaitMin} min</span> (counted to 19:20, when the data ends). Across the day, anticipation averts {facts.rewind.strokeMinutesAverted} stroke consult-minutes of waiting.
         </p>
       )}
     </Section>

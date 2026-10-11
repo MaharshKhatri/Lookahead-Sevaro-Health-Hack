@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const fmt = new Intl.NumberFormat('en-US');
 
 const PIPELINE = [
-  { name: 'Raw events', text: `The ${fmt.format(facts.events)} events of the evening: calls, video sessions, status changes, camera and presence signals, assignments and notes.` },
+  { name: 'Raw events', text: `The ${fmt.format(facts.events)} events of the synthetic day: calls, video sessions, status changes, camera and presence signals, assignments and notes.` },
   { name: 'Knowledge-time replay', text: 'State is rebuilt from what was known at each instant, in the order things happened. A duplicate is applied once.' },
   { name: 'Availability inference', text: 'Physician state is inferred from signals, not taken from self-reported status alone. A camera on with no session counts as busy and is flagged.' },
   { name: 'Breach detection', text: 'Each consult stage is timed against the operational standards, so a breach is caught at the minute it happens.' },

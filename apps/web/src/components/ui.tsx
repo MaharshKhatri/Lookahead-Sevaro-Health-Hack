@@ -116,6 +116,8 @@ export function Button({
   testId,
   size = 'md',
   type = 'button',
+  autoFocus,
+  confirmTrigger,
 }: {
   readonly children: ReactNode;
   readonly onClick?: () => void;
@@ -126,14 +128,18 @@ export function Button({
   readonly testId?: string;
   readonly size?: 'sm' | 'md' | 'lg';
   readonly type?: 'button' | 'submit';
+  readonly autoFocus?: boolean;
+  /** Marks the first-click button of a confirm-before-send pair (lead inbox "A" key). */
+  readonly confirmTrigger?: boolean;
 }) {
   const tones = {
     accent: 'bg-accent text-bg hover:bg-accent/85 border-accent',
     ok: 'bg-ok text-bg hover:bg-ok/85 border-ok',
     critical: 'bg-transparent text-critical border-critical/70 hover:bg-critical/15',
-    muted: 'bg-raised text-text border-border hover:border-accent',
+    // Secondary = outline (UI pass, D-98).
+    muted: 'bg-transparent text-text border-border hover:border-accent',
   };
-  const sizes = { sm: 'px-2 py-1 text-[13px]', md: 'px-3 py-1.5 text-[14px]', lg: 'px-5 py-4 text-[20px]' };
+  const sizes = { sm: 'px-2 py-1 text-[13px]', md: 'px-3 py-1.5 text-[14px]', lg: 'min-h-12 px-5 py-3 text-[18px]' };
   return (
     <button
       type={type}
@@ -141,7 +147,9 @@ export function Button({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={cx('rounded-md border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40', tones[tone], sizes[size], className)}
+      autoFocus={autoFocus}
+      data-confirm-trigger={confirmTrigger === true ? 'true' : undefined}
+      className={cx('rounded-[2px] border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40', tones[tone], sizes[size], className)}
     >
       {children}
     </button>

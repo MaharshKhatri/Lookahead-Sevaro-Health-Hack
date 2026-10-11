@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandResponse, PublicOfferDTO } from '@/lib/dto';
 import { plainError } from '@/lib/errors';
-import { countdown, etHms } from '@/lib/format';
+import { countdown, etHm, etHms } from '@/lib/format';
 import { newCommandId, useStoreVersion } from './live';
 import { Button, Chip, cx } from './ui';
 
@@ -72,7 +72,7 @@ export function PhoneOffer({ offerId, token, initial }: { readonly offerId: stri
 
   if (offer === null) {
     return (
-      <main className="mx-auto max-w-[480px] p-6">
+      <main className="mx-auto max-w-[390px] p-6">
         <p className="text-[18px] text-muted">This offer link is not valid.</p>
       </main>
     );
@@ -85,7 +85,7 @@ export function PhoneOffer({ offerId, token, initial }: { readonly offerId: stri
   const urgent = left !== null && left < 120_000;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[480px] flex-col px-5 pb-8 pt-6" data-testid="phone-offer" data-status={offer.status}>
+    <main className="mx-auto flex min-h-screen max-w-[390px] flex-col px-5 pb-8 pt-6" data-testid="phone-offer" data-status={offer.status}>
       <div className="flex items-center justify-between">
         <span className="text-[15px] font-bold">
           Look<span className="text-accent">ahead</span>
@@ -96,9 +96,12 @@ export function PhoneOffer({ offerId, token, initial }: { readonly offerId: stri
       <h1 className="mt-6 text-[28px] font-bold leading-tight" data-testid="phone-headline">
         {offer.headline}
       </h1>
+      <p className="num mt-2 text-[20px] text-text" data-testid="phone-window">
+        {etHm(offer.startMs)}–{etHm(offer.endMs)} ET
+      </p>
 
       {offer.canRespond && left !== null && (
-        <div className={cx('mt-4 rounded-2xl border p-4 text-center', urgent ? 'border-critical bg-critical/10' : 'border-warning/60 bg-warning/10')}>
+        <div className={cx('mt-4 rounded-[2px] border p-4 text-center', urgent ? 'border-critical bg-critical/10' : 'border-warning/60 bg-warning/10')}>
           <div className="text-[13px] font-semibold uppercase tracking-wider text-muted">Expires in</div>
           <div className={cx('num text-[52px] font-semibold leading-none', urgent ? 'text-critical' : 'text-warning')} data-testid="phone-countdown">
             {countdown(left)}
@@ -107,17 +110,19 @@ export function PhoneOffer({ offerId, token, initial }: { readonly offerId: stri
       )}
 
       {offer.messageLines !== null && (
-        <div className="mt-5 space-y-2 rounded-2xl border border-border bg-panel p-4 text-[18px] leading-snug" data-testid="phone-message">
+        <div className="mt-5 space-y-2 rounded-[2px] border border-border bg-panel p-4 text-[18px] leading-snug" data-testid="phone-message">
           {offer.messageLines.map((l) => (
             <p key={l}>{l}</p>
           ))}
         </div>
       )}
 
+      {offer.messageLines !== null && <p className="mt-2 text-[13px] text-muted" data-testid="phone-no-phi">No case information is included.</p>}
+
       {offer.reason !== null && <p className="mt-4 text-[17px] text-muted">{offer.reason}</p>}
 
       {error !== null && (
-        <div role="alert" className="mt-4 rounded-xl border border-critical/70 bg-critical/10 p-3 text-[15px] text-critical" data-testid="phone-error">
+        <div role="alert" className="mt-4 rounded-[2px] border border-critical/70 bg-critical/10 p-3 text-[15px] text-critical" data-testid="phone-error">
           {error}
         </div>
       )}
@@ -125,10 +130,10 @@ export function PhoneOffer({ offerId, token, initial }: { readonly offerId: stri
       <div className="mt-auto pt-8">
         {offer.canRespond ? (
           <div className="grid grid-cols-1 gap-3">
-            <Button size="lg" tone="ok" className="min-h-[64px]" testId="offer-accept" disabled={busy} onClick={() => void respond('accept')}>
+            <Button size="lg" tone="accent" className="min-h-[56px] w-full" testId="offer-accept" disabled={busy} onClick={() => void respond('accept')}>
               Accept
             </Button>
-            <Button size="lg" tone="muted" className="min-h-[64px]" testId="offer-decline" disabled={busy} onClick={() => void respond('decline')}>
+            <Button size="lg" tone="muted" className="min-h-[56px] w-full" testId="offer-decline" disabled={busy} onClick={() => void respond('decline')}>
               Decline
             </Button>
           </div>

@@ -77,6 +77,7 @@ test('@demo standby loop: pre-alert on the bench -> lead approves -> phone "I ca
   await expect(leadCard).toHaveAttribute('data-stage', 'prealert');
   await expect(leadCard).not.toContainText(/CON-\d+|EVT-\d+|stroke|patient/i);
   await lead.getByTestId('lead-approve-standby').click();
+  await lead.getByTestId('lead-approve-standby-confirm').click();
   await expect(card.getByTestId('standby-status')).toHaveText('Pre-alert sent');
 
   const phoneCtx = await browser.newContext(device(baseURL, { width: 390, height: 844 }, true));
@@ -92,6 +93,7 @@ test('@demo standby loop: pre-alert on the bench -> lead approves -> phone "I ca
   await expect(card.getByTestId('standby-status')).toHaveText('Activation awaiting approval');
   await expect(lead.getByTestId('lead-standby')).toHaveAttribute('data-stage', 'activation');
   await lead.getByTestId('lead-approve-activation').click();
+  await lead.getByTestId('lead-approve-activation-confirm').click();
   await expect(card.getByTestId('standby-status')).toHaveText('Activation sent');
   await expect(phone.getByTestId('activation-accept')).toBeVisible();
   await phone.getByTestId('activation-accept').click();
@@ -111,6 +113,7 @@ test('release path: pre-alert -> ready -> the lead releases -> RELEASED with a P
   const lead = await leadCtx.newPage();
   await openLead(lead);
   await lead.getByTestId('lead-approve-standby').click();
+  await lead.getByTestId('lead-approve-standby-confirm').click();
   await expect(card.getByTestId('standby-status')).toHaveText('Pre-alert sent');
   const phoneCtx = await browser.newContext(device(baseURL, { width: 390, height: 844 }, true));
   const phone = await phoneCtx.newPage();

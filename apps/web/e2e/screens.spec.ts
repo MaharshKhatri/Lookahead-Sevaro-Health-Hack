@@ -51,6 +51,7 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await shot(phone, '04-lead-inbox-390');
   await shot(phone, '04b-lead-inbox-390-full', true);
   await phone.getByTestId('lead-approve').click();
+  await phone.getByTestId('lead-approve-confirm').click();
   await expect(phone.getByTestId('lead-empty')).toBeVisible();
 
   await expect(card.getByTestId('offer-status')).toHaveText('DELIVERED');
@@ -112,6 +113,7 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await expect(phone.getByTestId('lead-standby')).toBeVisible();
   await shot(phone, '20-lead-standby-390');
   await phone.getByTestId('lead-approve-standby').click();
+  await phone.getByTestId('lead-approve-standby-confirm').click();
   const benchCard = page.locator('[data-testid=bench-card]').first();
   await expect(benchCard.getByTestId('standby-status')).toHaveText('Pre-alert sent');
   const sbHref = (await benchCard.getByTestId('standby-link').getAttribute('href')) ?? '';
@@ -124,6 +126,30 @@ test('screenshots of every page', async ({ page, browser, baseURL, request }) =>
   await page.goto('/quality');
   await expect(page.getByTestId('quality-table')).toBeVisible();
   await shot(page, '23-quality');
+
+  // Final polish sprint: opener, architecture, Stress Test drawer, simulator, design system.
+  await page.goto('/opener');
+  await expect(page.getByTestId('opener-sentence').first()).toBeVisible({ timeout: 30_000 });
+  await shot(page, '25-opener');
+  await page.goto('/architecture');
+  await expect(page.getByTestId('arch-counters')).toBeVisible();
+  await shot(page, '26-architecture');
+  await page.goto('/simulator');
+  await expect(page.getByTestId('simulator')).toBeVisible();
+  await page.getByTestId('sim-send-stroke_consult').click();
+  await expect(page.getByTestId('sim-out-row').first()).toBeVisible();
+  await shot(page, '27-simulator');
+  await page.goto('/');
+  await expect(page.getByTestId('attention-top')).toBeVisible();
+  await page.getByTestId('stress-open').click();
+  await expect(page.getByTestId('stress-panel')).toBeVisible();
+  await page.getByTestId('stress-action-deterministic_forecast').click();
+  await expect(page.getByTestId('stress-result').first()).toBeVisible({ timeout: 20_000 });
+  await shot(page, '28-stress-test');
+  await page.keyboard.press('Escape');
+  await page.goto('/design');
+  await expect(page.getByTestId('design')).toBeVisible();
+  await shot(page, '29-design', true);
 
   // Dataset admin: a package with the brief's own headers ("Event time", "Phys."), not activated.
   const RAW = new URL('../../../data/raw/', import.meta.url);

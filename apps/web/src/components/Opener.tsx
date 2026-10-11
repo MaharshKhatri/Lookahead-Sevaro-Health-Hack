@@ -121,26 +121,26 @@ function Timeline({ o }: { readonly o: OpenerSummary }) {
         <rect x={x(o.actualGapOpenedMs)} y={8} width={Math.max(2, x(o.actualGapEndMs) - x(o.actualGapOpenedMs))} height={16} rx={2} fill="var(--color-critical)">
           <title>{`Actual: unassigned ${etHm(o.actualGapOpenedMs)}-${etHm(o.actualGapEndMs)} ET, ${o.actualWaitMin} min`}</title>
         </rect>
-        <rect x={x(o.actualGapOpenedMs)} y={36} width={Math.max(2, x(o.wouldHaveAssignedMs) - x(o.actualGapOpenedMs))} height={16} rx={2} fill="var(--color-ok)">
+        <rect x={x(o.actualGapOpenedMs)} y={36} width={Math.max(2, x(o.wouldHaveAssignedMs) - x(o.actualGapOpenedMs))} height={16} rx={2} fill="var(--color-accent)">
           <title>{`With Lookahead: unassigned ${etHm(o.actualGapOpenedMs)}-${etHm(o.wouldHaveAssignedMs)} ET, ${wouldMin} min`}</title>
         </rect>
         {actionMs !== null && (
           <g>
-            <line x1={x(actionMs)} x2={x(actionMs)} y1={2} y2={TH - 2} stroke="var(--color-ok)" strokeWidth={3} />
+            <line x1={x(actionMs)} x2={x(actionMs)} y1={2} y2={TH - 2} stroke="var(--color-accent)" strokeWidth={3} />
             <title>{`Lookahead ${actionWord} at ${etHm(actionMs)} ET`}</title>
           </g>
         )}
         {o.onlineTimeMs !== null && (
           <g>
-            <line x1={x(o.onlineTimeMs)} x2={x(o.onlineTimeMs)} y1={2} y2={TH - 2} stroke="var(--color-ok)" strokeWidth={1.5} strokeDasharray="3 3" />
+            <line x1={x(o.onlineTimeMs)} x2={x(o.onlineTimeMs)} y1={2} y2={TH - 2} stroke="var(--color-accent)" strokeWidth={1.5} strokeDasharray="3 3" />
             <title>{`Relief online at ${etHm(o.onlineTimeMs)} ET`}</title>
           </g>
         )}
       </svg>
       <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted">
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm bg-critical align-middle" />actual gap</span>
-        <span><span className="mr-1 inline-block h-3 w-1 bg-ok align-middle" />Lookahead action</span>
-        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm bg-ok align-middle" />would-have wait</span>
+        <span><span className="mr-1 inline-block h-3 w-1 bg-accent align-middle" />Lookahead action</span>
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm bg-accent align-middle" />would-have wait</span>
         <span className="num w-full">{summary}</span>
       </figcaption>
     </figure>
@@ -184,8 +184,8 @@ export function OpenerContent({ data }: { readonly data: OpenerPageDTO }) {
       ) : (
         <>
           <div className="mt-6 space-y-4">
-            {openerSentences(o).map((s) => (
-              <p key={s} className="text-[24px] leading-snug sm:text-[34px]" data-testid="opener-sentence">
+            {openerSentences(o).map((s, i) => (
+              <p key={s} className={i === 0 ? 'text-[26px] font-semibold leading-tight sm:text-[44px]' : 'text-[20px] leading-snug text-text/90 sm:text-[28px]'} data-testid="opener-sentence">
                 {s}
               </p>
             ))}
@@ -201,9 +201,10 @@ export function OpenerContent({ data }: { readonly data: OpenerPageDTO }) {
           </a>
         </p>
       )}
+      {data.impact !== null && <p className="mt-1 text-[13px] text-ink3">Saver JL. Time Is Brain—Quantified. Stroke. 2006;37:263–266. Extrapolation, not a clinical outcome measurement.</p>}
       <Assumptions a={data.assumptions} />
-      <a href="/" className="mt-10 inline-block rounded bg-accent px-8 py-4 text-[20px] font-semibold text-bg" data-testid="opener-start">
-        Start live demo
+      <a href="/" className="mt-10 inline-flex min-h-12 items-center rounded-[2px] bg-accent px-8 text-[18px] font-semibold text-bg" data-testid="opener-start">
+        Open the command center
       </a>
     </section>
   );

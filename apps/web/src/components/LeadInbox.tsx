@@ -118,9 +118,7 @@ function OfferApproval({ o, view }: { readonly o: OfferDTO; readonly view: ViewD
       </Section>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Button size="lg" tone="ok" testId="lead-approve" onClick={() => void send({ type: 'approveOffer', offerId: o.offerId }, { okText: `Approved: sent to ${o.name} (simulated ${o.channel})` })}>
-          Approve
-        </Button>
+        <ConfirmSend testId="lead-approve" label="Approve" to={o.name} message={o.message} onConfirm={() => void send({ type: 'approveOffer', offerId: o.offerId }, { okText: `Approved: sent to ${o.name} (simulated ${o.channel})` })} />
         <Button size="lg" tone="critical" testId="lead-reject-open" onClick={() => setRejecting((r) => !r)}>
           Reject…
         </Button>
@@ -153,6 +151,47 @@ function EscalationCard({ e }: { readonly e: EscalationDTO }) {
         Authorize escalation
       </Button>
     </article>
+  );
+}
+
+/**
+ * Approve -> confirm (UI pass): the clinical lead sees the exact text that will
+ * be sent before it goes out. The confirm button takes focus, so Enter sends and
+ * Esc or Cancel goes back. Nothing is sent until "Confirm and send".
+ */
+function ConfirmSend({ testId, label, to, message, onConfirm }: { readonly testId: string; readonly label: string; readonly to: string; readonly message: string; readonly onConfirm: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <Button size="lg" tone="accent" testId={testId} confirmTrigger onClick={() => setOpen(true)}>
+        {label}
+      </Button>
+    );
+  return (
+    <div className="col-span-2 space-y-2 rounded-[2px] border border-accent bg-bg p-3" data-testid={`${testId}-panel`} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+      <p className="text-[15px] font-semibold text-text">Send this exact message to {to}?</p>
+      <pre className="num whitespace-pre-wrap text-[13px] text-text/90" data-testid={`${testId}-message`}>
+        {message}
+      </pre>
+      <p className="text-[13px] text-muted">No case information is included.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          size="lg"
+          tone="accent"
+          testId={`${testId}-confirm`}
+          autoFocus
+          onClick={() => {
+            setOpen(false);
+            onConfirm();
+          }}
+        >
+          Confirm and send
+        </Button>
+        <Button size="lg" tone="muted" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -190,9 +229,7 @@ function StandbyApproval({ s }: { readonly s: StandbyDTO }) {
       <div className="mt-4 grid grid-cols-2 gap-2">
         {stage === 'prealert' && (
           <>
-            <Button size="lg" tone="ok" testId="lead-approve-standby" onClick={() => void send({ type: 'approveStandby', standbyId: s.standbyId }, { okText: `Pre-alert sent to ${s.name} (simulated ${s.channel})` })}>
-              Approve pre-alert
-            </Button>
+            <ConfirmSend testId="lead-approve-standby" label="Approve pre-alert" to={s.name} message={text} onConfirm={() => void send({ type: 'approveStandby', standbyId: s.standbyId }, { okText: `Pre-alert sent to ${s.name} (simulated ${s.channel})` })} />
             <Button size="lg" tone="critical" testId="lead-reject-standby" onClick={() => void send({ type: 'rejectStandby', standbyId: s.standbyId, ...(reason.trim() === '' ? {} : { reason: reason.trim() }) }, { okText: 'Pre-alert rejected' })}>
               Reject
             </Button>
@@ -200,9 +237,7 @@ function StandbyApproval({ s }: { readonly s: StandbyDTO }) {
         )}
         {stage === 'activation' && (
           <>
-            <Button size="lg" tone="ok" testId="lead-approve-activation" onClick={() => void send({ type: 'approveActivation', standbyId: s.standbyId }, { okText: `Activation sent to ${s.name}` })}>
-              Approve activation
-            </Button>
+            <ConfirmSend testId="lead-approve-activation" label="Approve activation" to={s.name} message={text} onConfirm={() => void send({ type: 'approveActivation', standbyId: s.standbyId }, { okText: `Activation sent to ${s.name}` })} />
             <Button size="lg" tone="critical" testId="lead-reject-activation" onClick={() => void send({ type: 'rejectActivation', standbyId: s.standbyId, ...(reason.trim() === '' ? {} : { reason: reason.trim() }) }, { okText: 'Activation rejected' })}>
               Reject
             </Button>
@@ -227,10 +262,12 @@ function Inbox() {
       if (view === null || (e.key !== 'a' && e.key !== 'A') || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
-      const offer = view.offers.find((o) => o.status === 'proposed');
-      const sb = (view.standby?.standbys ?? []).find((s) => s.status === 'proposed' || s.status === 'activation_proposed');
-      if (offer !== undefined) void send({ type: 'approveOffer', offerId: offer.offerId }, { okText: `Approved: sent to ${offer.name}` });
-      else if (sb !== undefined) void send({ type: sb.status === 'proposed' ? 'approveStandby' : 'approveActivation', standbyId: sb.standbyId }, { okText: `Approved: ${sb.name}` });
+      // A opens the first pending confirmation (the exact message); Enter on the focused "Confirm and send" sends it.
+      const trigger = document.querySelector<HTMLButtonElement>('[data-confirm-trigger="true"]');
+      if (trigger !== null) {
+        e.preventDefault();
+        trigger.click();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

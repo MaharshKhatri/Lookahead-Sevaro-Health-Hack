@@ -38,6 +38,7 @@ test('@demo closed loop: propose on "/" -> approve on /lead -> accept on /offer 
   await expect(lead.getByTestId('lead-offer')).toHaveAttribute('data-offer-id', offerId);
   await expect(lead.getByTestId('narration-lead_briefing')).toBeVisible();
   await lead.getByTestId('lead-approve').click();
+  await lead.getByTestId('lead-approve-confirm').click();
   await expect(lead.getByTestId('lead-empty')).toBeVisible();
 
   // The console follows via SSE: delivered, with a QR to the physician's view.
@@ -126,6 +127,7 @@ test('offer link without its token is refused (page and API)', async ({ page, br
   const lead = await leadCtx.newPage();
   await openLead(lead);
   await lead.getByTestId('lead-approve').click();
+  await lead.getByTestId('lead-approve-confirm').click();
   await expect(card.getByTestId('offer-status')).toHaveText('DELIVERED');
   await page.goto(`/offer/${offerId}`);
   await expect(page.getByText('This offer link is not valid.')).toBeVisible();
@@ -147,6 +149,7 @@ async function proposeAndApprove(page: import('@playwright/test').Page, browser:
   await openLead(lead);
   if (approve) {
     await lead.getByTestId('lead-approve').click();
+    await lead.getByTestId('lead-approve-confirm').click();
     await expect(card.getByTestId('offer-status')).toHaveText('DELIVERED');
   }
   return { card, lead, leadCtx };

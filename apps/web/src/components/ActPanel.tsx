@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { OfferDTO, RecStepDTO, ViewDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
 import { LedgerTab, OffersTab, TrapTab, WhatIfTab } from './ActTabs';
+import { DetailColumn } from './DetailColumn';
 import { Explain } from './Explain';
 import { NextActions } from './NextActions';
 import { StressPanel } from './StressPanel';
@@ -152,6 +153,7 @@ export function ActPanel({ view }: { readonly view: ViewDTO }) {
     >
       <StressPanel open={stressOpen} onClose={closeStress} />
       <div className="scroll-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <DetailColumn view={view} />
         <NextActions view={view} />
         <div className="border-b border-border p-4" data-testid="recommendation">
           <div className="mb-1 flex items-center gap-2">

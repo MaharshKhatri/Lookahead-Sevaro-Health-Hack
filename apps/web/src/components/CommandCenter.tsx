@@ -113,7 +113,7 @@ function Console() {
   return (
     <>
       <ConsoleHorizon view={view} />
-      <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,30fr)_minmax(0,40fr)_minmax(0,30fr)] gap-3 p-3">
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 max-lg:[&>*]:h-[85vh] lg:grid-cols-[minmax(0,30fr)_minmax(0,40fr)_minmax(0,30fr)] lg:overflow-hidden">
         <AttentionList items={view.attention} incidents={view.intel?.incidents} reduction={view.intel?.reduction} />
         <div className="flex min-h-0 flex-col gap-3">
           <div className="min-h-0 flex-[11]">

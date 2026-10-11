@@ -157,7 +157,7 @@ export function AttentionList({ items, incidents, reduction }: { readonly items:
       className="h-full"
       title={
         <>
-          NOW <span className="normal-case tracking-normal text-text">— what needs attention</span>
+          NOW <span className="hidden normal-case tracking-normal text-text 2xl:inline">— what needs attention</span>
         </>
       }
       right={
@@ -172,7 +172,7 @@ export function AttentionList({ items, incidents, reduction }: { readonly items:
               </button>
             </div>
           )}
-          <span className="num text-[13px] text-muted" data-testid="now-count">
+          <span className="num whitespace-nowrap text-[12px] text-muted" data-testid="now-count">
             {showIncidents && reduction !== undefined ? `${reduction.items} items → ${reduction.incidents} incidents (−${reduction.percent}%)` : `${items.filter((i) => i.severity === 'critical').length} critical · ${items.length} items`}
           </span>
         </div>

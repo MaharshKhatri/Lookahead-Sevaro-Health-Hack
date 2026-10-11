@@ -105,8 +105,9 @@ test('@demo the console still fits the viewport under the chrome (no page scroll
   await page.goto('/');
   await expect(page.getByTestId('ai-banner')).toBeVisible();
   await expect(page.getByTestId('attention-top')).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
-  expect(overflow).toBeLessThanOrEqual(2);
+  // The band arrives after a client fetch and the chrome re-measures its height: poll until the layout settles.
+  await expect(page.locator('[data-testid=patient-clock], [data-testid=patient-clock-clear]').first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight), { timeout: 3_000 }).toBeLessThanOrEqual(2);
 });
 
 test('patient clock follows the stream: assignments move or collapse it, and a stroke consult at a blocked hospital appears within one SSE cycle', async ({ page, request }) => {

@@ -2,6 +2,7 @@
 
 import type { HospitalForecastDTO, SurgeForecastDTO } from '@/lib/dto';
 import { etHm } from '@/lib/format';
+import { AnalogBar } from '@/ui/kit';
 import { DeltaChip } from './DeltaChip';
 import { Chip, cx, shortName } from './ui';
 import type { Delta } from './useDelta';
@@ -67,6 +68,7 @@ function RadarRow({ h, bucketMin, deltas }: { readonly h: HospitalForecastDTO; r
         <span className="num text-[12px] text-muted" title="consult_received in the trailing 60 min vs the hour's p90 (brief spike test)">
           observed <span className="text-text" data-testid="radar-observed">{h.observedLast60}</span>/60 min · p90 <span className="text-text">{h.p90Now ?? '–'}</span>
         </span>
+        <AnalogBar value={h.observedLast60} normalMax={h.p90Now} max={Math.max(h.observedLast60, h.p90Now ?? 0, 3) + 1} label={`${h.hospitalName} trailing 60 min`} />
         <DeltaChip d={deltas.get(`observed:${h.hospitalId}`)} />
         <span className="ml-auto flex flex-wrap items-center gap-1">
           {chips.map(({ m, c }) => {

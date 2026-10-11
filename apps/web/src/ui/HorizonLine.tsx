@@ -22,10 +22,10 @@ export const PAST_MIN = 30;
 export const FUTURE_MIN = 180;
 const MIN = 60_000;
 const DEFAULT_W = 1200;
-const H = 132;
+const H = 116;
 const PAD_L = 8;
 const PAD_R = 12;
-const AXIS_Y = 74;
+const AXIS_Y = 64;
 const CHAR_W = 6.1;
 
 export interface HorizonMarker {
@@ -106,7 +106,7 @@ export function placeLabels(markers: readonly HorizonMarker[], x: (ms: number) =
 }
 
 // Lanes sit 18 px apart; the topmost lane (-2) stays clear of the "now" label at the top edge.
-const laneY = (lane: number) => (lane < 0 ? AXIS_Y - 20 - (Math.abs(lane) - 1) * 18 : AXIS_Y + 22 + (lane - 1) * 18);
+const laneY = (lane: number) => (lane < 0 ? AXIS_Y - 18 - (Math.abs(lane) - 1) * 16 : AXIS_Y + 20 + (lane - 1) * 16);
 
 export function HorizonLine({
   items,
@@ -214,7 +214,7 @@ export function HorizonLine({
         )}
         {/* now edge */}
         <line x1={nowX} x2={nowX} y1={8} y2={H - 16} stroke="var(--color-text)" strokeWidth="1.5" />
-        <text x={nowX + 4} y={13} fontSize="11" className="num" fill="var(--color-text)">
+        <text x={nowX + 4} y={12} fontSize="11" className="num" fill="var(--color-text)">
           now {etHm(nowMs)}
         </text>
         {/* point markers */}

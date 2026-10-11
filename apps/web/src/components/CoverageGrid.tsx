@@ -5,6 +5,7 @@ import type { Need } from '@lookahead/engine';
 import type { CellClass, CoverageCellDTO, CoverageGridDTO, CoverageRowDTO, DemandChipDTO } from '@/lib/dto';
 import { etEnd, etHm } from '@/lib/format';
 import { CLASS_WORD, Chip, ClassChip, NeedChip, Panel, cx, shortName } from './ui';
+import { Pips } from '@/ui/kit';
 
 /**
  * CENTER "NEXT 2 HOURS — coverage": hospitals x 15-min buckets from now
@@ -39,11 +40,14 @@ function cellTitle(row: CoverageRowDTO, c: CoverageCellDTO): string {
 
 function Row({ row, cells, markerStarts }: { readonly row: CoverageRowDTO; readonly cells: readonly CoverageCellDTO[]; readonly markerStarts: ReadonlySet<number> }) {
   return (
-    <tr data-testid={`coverage-row-${row.hospitalId}`}>
+    <tr data-testid={`coverage-row-${row.hospitalId}`} data-hospital-id={row.hospitalId}>
       <th scope="row" className="sticky left-0 z-10 border-b border-border bg-panel py-1 pl-3 pr-2 text-left align-middle font-normal">
         <div className="truncate text-[14px] font-semibold leading-tight text-text" title={row.hospitalName}>{row.hospitalName}</div>
-        <div className="num text-[11px] text-muted">
-          {row.hospitalId} · routable now {row.routableNow}
+        <div className="num flex items-center gap-1.5 text-[11px] text-muted">
+          {cells[0] !== undefined && <Pips available={row.routableNow} required={cells[0].required} label={`${row.hospitalName} routable now against required`} />}
+          <span>
+            {row.hospitalId} · routable now {row.routableNow}
+          </span>
         </div>
       </th>
       {cells.map((c, i) => (
@@ -113,8 +117,8 @@ export function CoverageGrid({ grid, demand, needs }: { readonly grid: CoverageG
         ))}
         {markers.length === 0 && <span className="text-muted">No shift changes in this window.</span>}
       </div>
-      <div className="scroll-thin min-h-0 flex-1 overflow-auto">
-        <table className={cx('w-full table-fixed border-separate border-spacing-0', span === 'all' && 'min-w-[1380px]')} data-testid="coverage-grid">
+      <div className="scroll-thin min-h-0 flex-1 overflow-auto" tabIndex={0} role="region" aria-label="Coverage grid">
+        <table className={cx('w-full table-fixed border-separate border-spacing-0', span === 'all' ? 'min-w-[1380px]' : 'min-w-[620px]')} data-testid="coverage-grid">
           <thead className="sticky top-0 z-20 bg-panel">
             <tr>
               <th className="sticky left-0 z-30 w-[164px] border-b border-border bg-panel px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">

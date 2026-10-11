@@ -115,16 +115,16 @@ export function TopBar() {
   const snapLabel = c === undefined ? '18:20' : etHm(c.snapshotMs);
   return (
     <>
-      <header className="flex h-[72px] items-center gap-5 border-b border-border bg-panel px-5">
+      <header className="flex h-14 min-w-0 items-center gap-3 border-b border-border bg-panel px-3 2xl:gap-5 2xl:px-5">
         <Link href="/" className="flex items-baseline gap-2">
-          <span className="text-[26px] font-bold tracking-tight text-text">
+          <span className="text-[22px] font-bold tracking-tight text-text 2xl:text-[26px]">
             Look<span className="text-accent">ahead</span>
           </span>
-          <span className="hidden text-[12px] uppercase tracking-[0.14em] text-muted xl:inline">tele-neuro ops</span>
+          <span className="hidden text-[12px] uppercase tracking-[0.14em] text-muted 2xl:inline">tele-neuro ops</span>
         </Link>
 
         <div className="flex items-baseline gap-2" data-testid="sim-clock">
-          <span className="num text-[38px] font-semibold leading-none text-text">{c === undefined ? '--:--:--' : etHms(c.nowMs)}</span>
+          <span className="num text-[28px] font-semibold leading-none text-text 2xl:text-[36px]">{c === undefined ? '--:--:--' : etHms(c.nowMs)}</span>
           <span className="text-[14px] font-semibold text-muted">ET</span>
           <span className={cx('ml-1 text-[12px] font-semibold uppercase tracking-wide', playing ? 'text-ok' : 'text-muted')}>{playing ? `▶ playing ${c?.speed}×` : '⏸ paused'}</span>
         </div>
@@ -171,14 +171,14 @@ export function TopBar() {
           </Button>
         </div>
 
-        <nav className="ml-auto flex items-center gap-1">
+        <nav className="scroll-thin ml-auto flex min-w-0 items-center gap-0.5 overflow-x-auto whitespace-nowrap" aria-label="Pages">
           {LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className={cx('rounded px-2 py-1 text-[14px]', path === l.href ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
+            <Link key={l.href} href={l.href} className={cx('rounded-[2px] px-1.5 py-1 text-[13px] 2xl:px-2 2xl:text-[14px]', path === l.href ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
               {l.label}
             </Link>
           ))}
           {upstream.enabled && (
-            <Link href="/simulator" data-testid="nav-simulator" className={cx('rounded px-2 py-1 text-[14px]', path === '/simulator' ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
+            <Link href="/simulator" data-testid="nav-simulator" className={cx('rounded-[2px] px-1.5 py-1 text-[13px] 2xl:px-2 2xl:text-[14px]', path === '/simulator' ? 'bg-raised text-text' : 'text-muted hover:text-text')}>
               Simulator
             </Link>
           )}

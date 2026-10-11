@@ -28,7 +28,14 @@ const H = 220;
 const PAD = { l: 44, r: 12, t: 16, b: 28 };
 
 const MARKER_WORD: Readonly<Record<string, string>> = { rule_tripped: 'RULE TRIPPED', pre_alert: 'PRE-ALERT', activation: 'ACTIVATION', online: 'ONLINE', first_routing_failure: 'FIRST ROUTING FAILURE', deadlock: 'DEADLOCK' };
-const MARKER_COLOR: Readonly<Record<string, string>> = { rule_tripped: 'var(--color-warning)', pre_alert: 'var(--color-info)', activation: 'var(--color-accent)', online: 'var(--color-ok)', first_routing_failure: 'var(--color-critical)', deadlock: 'var(--color-critical)' };
+const MARKER_COLOR: Readonly<Record<string, string>> = {
+  rule_tripped: 'var(--color-warning)',
+  pre_alert: 'var(--color-info)',
+  activation: 'var(--color-accent)',
+  online: 'var(--color-ok)',
+  first_routing_failure: 'var(--color-critical)',
+  deadlock: 'var(--color-critical)',
+};
 const LINE_COLORS = ['var(--color-critical)', 'var(--color-warning)', 'var(--color-info)', 'var(--color-accent)', 'var(--color-ok)'];
 
 function Chart({ r, idx }: { readonly r: RewindReportDTO; readonly idx: number }) {
@@ -44,47 +51,54 @@ function Chart({ r, idx }: { readonly r: RewindReportDTO; readonly idx: number }
   const path = (key: 'pSpikeByHospital' | 'pGapByHospital', h: string) => r.origins.map((o, i) => `${i === 0 ? 'M' : 'L'} ${x(o.tMs).toFixed(1)} ${y(o[key][h] ?? 0).toFixed(1)}`).join(' ');
   const cur = r.origins[idx];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-labelledby="rw-title rw-desc" data-testid="rewind-chart">
-      <title id="rw-title">P(spike) and P(gap) by origin</title>
-      <desc id="rw-desc">{hospitals.map((h) => `${r.hospitalNames?.[h] ?? h}: P(gap) at the last origin ${r.origins.at(-1)?.pGapByHospital[h] ?? 0}`).join('; ')}</desc>
-      {[0, 0.5, 1].map((p) => (
-        <g key={p}>
-          <line x1={PAD.l} x2={W - PAD.r} y1={y(p)} y2={y(p)} stroke="var(--color-border)" />
-          <text x={PAD.l - 6} y={y(p) + 4} textAnchor="end" fontSize={10} fill="var(--color-muted)" className="num">
-            {p}
-          </text>
-        </g>
-      ))}
-      {r.origins.filter((_, i) => i % 6 === 0).map((o) => (
-        <text key={o.tMs} x={x(o.tMs)} y={H - 10} textAnchor="middle" fontSize={10} fill="var(--color-muted)" className="num">
-          {etHm(o.tMs)}
-        </text>
-      ))}
-      {hospitals.map((h, i) => (
-        <g key={h}>
-          <path d={path('pGapByHospital', h)} fill="none" stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2}>
-            <title>{`${r.hospitalNames?.[h] ?? h}: P(gap)`}</title>
-          </path>
-          <path d={path('pSpikeByHospital', h)} fill="none" stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={1.5} strokeDasharray="4 3">
-            <title>{`${r.hospitalNames?.[h] ?? h}: P(spike at +60)`}</title>
-          </path>
-        </g>
-      ))}
-      {r.markers.map((m) => (
-        <g key={`${m.kind}|${m.tMs}`}>
-          <line x1={x(m.tMs)} x2={x(m.tMs)} y1={PAD.t} y2={H - PAD.b} stroke={MARKER_COLOR[m.kind] ?? 'var(--color-muted)'} strokeWidth={1.5} strokeDasharray={m.kind === 'online' ? undefined : '2 2'} />
-          <title>{m.detail}</title>
-        </g>
-      ))}
-      {cur !== undefined && <line x1={x(cur.tMs)} x2={x(cur.tMs)} y1={PAD.t} y2={H - PAD.b} stroke="var(--color-text)" strokeWidth={2} />}
-      <g>
-        {hospitals.map((h, i) => (
-          <text key={h} x={PAD.l + 4 + i * 160} y={PAD.t - 4} fontSize={10} fill={LINE_COLORS[i % LINE_COLORS.length]}>
-            ■ {r.hospitalNames?.[h] ?? h} (solid P(gap), dashed P(spike))
-          </text>
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-labelledby="rw-title rw-desc" data-testid="rewind-chart">
+        <title id="rw-title">P(spike) and P(gap) by origin</title>
+        <desc id="rw-desc">{hospitals.map((h) => `${r.hospitalNames?.[h] ?? h}: P(gap) at the last origin ${r.origins.at(-1)?.pGapByHospital[h] ?? 0}`).join('; ')}</desc>
+        {[0, 0.5, 1].map((p) => (
+          <g key={p}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(p)} y2={y(p)} stroke="var(--color-border)" />
+            <text x={PAD.l - 6} y={y(p) + 4} textAnchor="end" fontSize={10} fill="var(--color-muted)" className="num">
+              {p}
+            </text>
+          </g>
         ))}
-      </g>
-    </svg>
+        {r.origins
+          .filter((_, i) => i % 6 === 0)
+          .map((o) => (
+            <text key={o.tMs} x={x(o.tMs)} y={H - 10} textAnchor="middle" fontSize={10} fill="var(--color-muted)" className="num">
+              {etHm(o.tMs)}
+            </text>
+          ))}
+        {hospitals.map((h, i) => (
+          <g key={h}>
+            <path d={path('pGapByHospital', h)} fill="none" stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2}>
+              <title>{`${r.hospitalNames?.[h] ?? h}: P(gap)`}</title>
+            </path>
+            <path d={path('pSpikeByHospital', h)} fill="none" stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={1.5} strokeDasharray="4 3">
+              <title>{`${r.hospitalNames?.[h] ?? h}: P(spike at +60)`}</title>
+            </path>
+          </g>
+        ))}
+        {r.markers.map((m) => (
+          <g key={`${m.kind}|${m.tMs}`}>
+            <line x1={x(m.tMs)} x2={x(m.tMs)} y1={PAD.t} y2={H - PAD.b} stroke={MARKER_COLOR[m.kind] ?? 'var(--color-muted)'} strokeWidth={1.5} strokeDasharray={m.kind === 'online' ? undefined : '2 2'} />
+            <title>{m.detail}</title>
+          </g>
+        ))}
+        {cur !== undefined && <line x1={x(cur.tMs)} x2={x(cur.tMs)} y1={PAD.t} y2={H - PAD.b} stroke="var(--color-text)" strokeWidth={2} />}
+      </svg>
+      {/* Legend in HTML (UI pass): SVG text scaled with the chart and the labels collided. */}
+      <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 px-1 text-[12px] text-muted" data-testid="rewind-legend">
+        {hospitals.map((h, i) => (
+          <li key={h} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="inline-block h-2 w-3" style={{ background: LINE_COLORS[i % LINE_COLORS.length] }} />
+            {r.hospitalNames?.[h] ?? h}
+          </li>
+        ))}
+        <li className="text-ink3">solid line: P(gap) · dashed line: P(spike)</li>
+      </ul>
+    </>
   );
 }
 
@@ -122,7 +136,15 @@ export function ImpactPanel({ report, idx, clinical }: { readonly report: Rewind
     }
   }
   return (
-    <Panel title="Clinical impact (estimate)" testId="impact" right={<span className="num text-[12px] text-muted">actual {now.actualMin} · reactive {now.reactiveMin} · anticipatory {now.anticipatoryMin} min</span>}>
+    <Panel
+      title="Clinical impact (estimate)"
+      testId="impact"
+      right={
+        <span className="num text-[12px] text-muted">
+          actual {now.actualMin} · reactive {now.reactiveMin} · anticipatory {now.anticipatoryMin} min
+        </span>
+      }
+    >
       <div className="p-3">
         <p className="text-[18px] leading-snug" data-testid="impact-sentence">
           {sentence}
@@ -155,7 +177,18 @@ function Body({ report, clinical }: { readonly report: RewindReportDTO | null; r
   return (
     <main className="scroll-thin flex-1 space-y-3 overflow-y-auto p-3" data-testid="rewind">
       <ImpactPanel report={report} idx={idx} clinical={clinical} />
-      <Panel title={<>REWIND <span className="normal-case tracking-normal text-text">— the day as if Lookahead had been running</span></>} right={<span className="num text-[12px] text-muted">{report.origins.length} origins · {etHm(report.fromMs)}–{etHm(report.toMs)} ET · step {report.stepMin} min</span>}>
+      <Panel
+        title={
+          <>
+            REWIND <span className="normal-case tracking-normal text-text">— the day as if Lookahead had been running</span>
+          </>
+        }
+        right={
+          <span className="num text-[12px] text-muted">
+            {report.origins.length} origins · {etHm(report.fromMs)}–{etHm(report.toMs)} ET · step {report.stepMin} min
+          </span>
+        }
+      >
         <div className="p-3">
           <Chart r={report} idx={idx} />
           <div className="mt-2 flex items-center gap-3">
@@ -176,7 +209,10 @@ function Body({ report, clinical }: { readonly report: RewindReportDTO | null; r
               </div>
               <div>
                 <div className="text-muted">pre-alert recommended</div>
-                <div className="font-semibold">{o.recommendedPreAlert.join(', ') || 'nobody'}{o.activationRecommended ? ' · activation recommended' : ''}</div>
+                <div className="font-semibold">
+                  {o.recommendedPreAlert.join(', ') || 'nobody'}
+                  {o.activationRecommended ? ' · activation recommended' : ''}
+                </div>
               </div>
               <div className="col-span-3 flex flex-wrap gap-2">
                 {Object.entries(o.pGapByHospital)
@@ -262,10 +298,22 @@ function Body({ report, clinical }: { readonly report: RewindReportDTO | null; r
             <div className="p-3 text-[13px]">
               <table className="w-full text-left">
                 <tbody>
-                  <tr><td className="text-muted">lead approval</td><td className="num text-right">{report.assumptions.leadApprovalMin} min</td></tr>
-                  <tr><td className="text-muted">acknowledgment</td><td className="num text-right">{report.assumptions.ackMin} min</td></tr>
-                  <tr><td className="text-muted">activation approval</td><td className="num text-right">{report.assumptions.activationApprovalMin} min</td></tr>
-                  <tr><td className="text-muted">accept</td><td className="num text-right">{report.assumptions.acceptMin} min</td></tr>
+                  <tr>
+                    <td className="text-muted">lead approval</td>
+                    <td className="num text-right">{report.assumptions.leadApprovalMin} min</td>
+                  </tr>
+                  <tr>
+                    <td className="text-muted">acknowledgment</td>
+                    <td className="num text-right">{report.assumptions.ackMin} min</td>
+                  </tr>
+                  <tr>
+                    <td className="text-muted">activation approval</td>
+                    <td className="num text-right">{report.assumptions.activationApprovalMin} min</td>
+                  </tr>
+                  <tr>
+                    <td className="text-muted">accept</td>
+                    <td className="num text-right">{report.assumptions.acceptMin} min</td>
+                  </tr>
                 </tbody>
               </table>
               <p className="mt-2 text-muted">{report.assumptions.note}</p>

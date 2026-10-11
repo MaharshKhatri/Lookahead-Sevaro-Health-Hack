@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAtMs": 1791725697448,
+  "generatedAtMs": 1791727877099,
   "command": "pnpm test:report (vitest run, engine + web)",
   "suites": {
     "engine": {
@@ -9,24 +9,24 @@
       "passed": 464,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 41603
+      "durationMs": 43280
     },
     "web": {
-      "files": 26,
-      "tests": 177,
-      "passed": 177,
+      "files": 27,
+      "tests": 179,
+      "passed": 179,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 82127
+      "durationMs": 83098
     }
   },
   "total": {
-    "files": 85,
-    "tests": 641,
-    "passed": 641,
+    "files": 86,
+    "tests": 643,
+    "passed": 643,
     "failed": 0,
     "skipped": 0,
-    "durationMs": 123730
+    "durationMs": 126378
   },
   "ok": true
 }

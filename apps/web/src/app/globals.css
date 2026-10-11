@@ -16,6 +16,8 @@
   --color-warning: #f5a524;
   --color-ok: #3fb68b;
   --color-info: #6ea8fe;
+  /* ink-3: tertiary text (citations, axis ticks). Values mirror src/ui/tokens.ts (test/contrast.test.ts). */
+  --color-ink3: #8193a8;
 
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -24,6 +26,44 @@
 html {
   font-size: 16px;
   color-scheme: dark;
+}
+
+/* Day theme (UI pass): same semantic names, light surfaces; values mirror src/ui/tokens.ts THEMES.day. */
+html[data-theme='day'] {
+  color-scheme: light;
+  --color-bg: #f4f6f9;
+  --color-panel: #ffffff;
+  --color-raised: #eaeef3;
+  --color-border: #cfd7e1;
+  --color-text: #0f1a2a;
+  --color-muted: #475569;
+  --color-ink3: #5b6878;
+  --color-accent: #0b7266;
+  --color-critical: #b91c25;
+  --color-warning: #8a5300;
+  --color-ok: #17734a;
+  --color-info: #1d4fa8;
+}
+
+/* Visible focus: 2 px action outline on every focusable element (keyboard users). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Skip link: hidden until focused. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 100;
+  padding: 4px 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: 2px solid var(--color-accent);
+}
+.skip-link:focus {
+  top: 8px;
 }
 
 body {
